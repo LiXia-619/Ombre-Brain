@@ -220,8 +220,8 @@ $$base\_score = Importance \times activation\_count^{0.3} \times e^{-\lambda \ti
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/P0lar1zzZ/Ombre-Brain)
 
-> ⚠️ **免费层限制**：Render 免费层在无流量时会休眠（冷启动约 30s），记忆服务需要持续在线建议升级到 Starter（$7/mo）或以上。
-> **Free tier note**: Render free tier sleeps on inactivity (cold start ~30s). For a memory server that should always be available, upgrade to Starter ($7/mo) or above.
+> ⚠️ **免费层不可用**：Render 免费层**不支持持久化磁盘**，服务重启后记忆数据会丢失，且会在无流量时休眠。**必须使用 Starter（$7/mo）或以上**才能正常使用。
+> **Free tier won't work**: Render free tier has **no persistent disk** — all memory data is lost on restart. It also sleeps on inactivity. **Starter plan ($7/mo) or above is required.**
 
 项目根目录已包含 `render.yaml`，点击按钮后：
 1. （可选）设置 `OMBRE_API_KEY`：任何 OpenAI 兼容 API 的 key，不填则自动降级为本地关键词提取

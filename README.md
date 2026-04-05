@@ -5,7 +5,6 @@
 A long-term emotional memory system for Claude. Tags memories using Russell's valence/arousal coordinates, stores them as Obsidian-compatible Markdown, connects via MCP, and has a forgetting curve.
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/P0lar1zzZ/Ombre-Brain)
-[![Deploy on Zeabur](https://zeabur.com/button.svg)](https://zeabur.com/deploy?repo=https://github.com/P0lar1zzZ/Ombre-Brain)
 
 ---
 
@@ -215,39 +214,48 @@ $$base\_score = Importance \times activation\_count^{0.3} \times e^{-\lambda \ti
 | `reclassify_api.py` | 用 API 重打标未分类桶 / Re-tag uncategorized buckets via API |
 | `test_smoke.py` | 冒烟测试 / Smoke test |
 
-## 一键部署 / One-click Deploy
+## 部署 / Deploy
 
 ### Render
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/P0lar1zzZ/Ombre-Brain)
 
+> ⚠️ **免费层限制**：Render 免费层在无流量时会休眠（冷启动约 30s），记忆服务需要持续在线建议升级到 Starter（$7/mo）或以上。
+> **Free tier note**: Render free tier sleeps on inactivity (cold start ~30s). For a memory server that should always be available, upgrade to Starter ($7/mo) or above.
+
 项目根目录已包含 `render.yaml`，点击按钮后：
-1. （可选）在 Render dashboard → **Environment** 里设置 `OMBRE_API_KEY`（任何 OpenAI 兼容 API 的 key，不填则自动降级为本地关键词提取）
-2. （可选）设置 `OMBRE_BASE_URL` 指定 API 地址（支持任意 OpenAI 化地址，如 `https://api.deepseek.com/v1` / `http://123.1.1.1:7689/v1` / `http://your-ollama:11434/v1` 等）
-3. Render 会自动挂载持久化磁盘到 `/opt/render/project/src/buckets`
-4. 部署完成后，MCP URL 为 `https://<你的服务名>.onrender.com/mcp`，填入 Claude Desktop / Claude.ai 的 MCP 设置
+1. （可选）设置 `OMBRE_API_KEY`：任何 OpenAI 兼容 API 的 key，不填则自动降级为本地关键词提取
+2. （可选）设置 `OMBRE_BASE_URL`：API 地址，支持任意 OpenAI 化地址，如 `https://api.deepseek.com/v1` / `http://123.1.1.1:7689/v1` / `http://your-ollama:11434/v1`
+3. Render 自动挂载持久化磁盘到 `/opt/render/project/src/buckets`
+4. 部署后 MCP URL：`https://<你的服务名>.onrender.com/mcp`
 
 `render.yaml` is included. After clicking the button:
-1. (Optional) Set `OMBRE_API_KEY` in Render dashboard → **Environment** (any OpenAI-compatible key; omit to fall back to local keyword extraction)
-2. (Optional) Set `OMBRE_BASE_URL` to any OpenAI-compatible endpoint (e.g. `https://api.deepseek.com/v1`, `http://123.1.1.1:7689/v1`, `http://your-ollama:11434/v1`)
-3. A persistent disk is auto-mounted at `/opt/render/project/src/buckets`
-4. After deploy, your MCP URL is `https://<your-service>.onrender.com/mcp` — add it to Claude Desktop / Claude.ai MCP settings
+1. (Optional) `OMBRE_API_KEY`: any OpenAI-compatible key; omit to fall back to local keyword extraction
+2. (Optional) `OMBRE_BASE_URL`: any OpenAI-compatible endpoint, e.g. `https://api.deepseek.com/v1`, `http://123.1.1.1:7689/v1`, `http://your-ollama:11434/v1`
+3. Persistent disk auto-mounts at `/opt/render/project/src/buckets`
+4. MCP URL after deploy: `https://<your-service>.onrender.com/mcp`
 
 ### Zeabur
 
-[![Deploy on Zeabur](https://zeabur.com/button.svg)](https://zeabur.com/deploy?repo=https://github.com/P0lar1zzZ/Ombre-Brain)
+Zeabur 暂不支持直接从 repo URL 一键部署，请手动操作：
 
-项目根目录已包含 `zbpack.json`，点击按钮后：
-1. （可选）在 Zeabur 控制台设置环境变量 `OMBRE_API_KEY`（任何 OpenAI 兼容 API 的 key，不填则自动降级为本地关键词提取）
-2. （可选）设置 `OMBRE_BASE_URL` 指定 API 地址（支持任意 OpenAI 化地址，如 `https://api.deepseek.com/v1` / `http://123.1.1.1:7689/v1` / `http://your-ollama:11434/v1` 等）
-3. Volume `ombre-buckets` 会挂载到 `/app/buckets`
-4. 部署完成后，MCP URL 为 `https://<你的域名>/mcp`，填入 Claude Desktop / Claude.ai 的 MCP 设置
+1. 打开 [zeabur.com](https://zeabur.com) → **New Project** → **Deploy from GitHub**
+2. 选择 `P0lar1zzZ/Ombre-Brain`，Zeabur 会自动识别根目录的 `zbpack.json`
+3. 在 **Variables** 里按需设置：
+   - `OMBRE_API_KEY`（可选，OpenAI 兼容 key）
+   - `OMBRE_BASE_URL`（可选，如 `https://api.deepseek.com/v1` / `http://ip:port/v1`）
+4. 在 **Volumes** 里挂载 `ombre-buckets` → `/app/buckets`
+5. 部署后 MCP URL：`https://<你的域名>/mcp`
 
-`zbpack.json` is included. After clicking:
-1. (Optional) Set `OMBRE_API_KEY` in the Zeabur console (omit to fall back to local keyword extraction)
-2. (Optional) Set `OMBRE_BASE_URL` to any OpenAI-compatible endpoint (e.g. `https://api.deepseek.com/v1`, `http://自定义:自定义/v1`, `http://your-ollama:11434/v1`)
-3. Volume `ombre-buckets` mounts at `/app/buckets`
-4. After deploy, your MCP URL is `https://<your-domain>/mcp` — add it to Claude Desktop / Claude.ai MCP settings
+Zeabur doesn't support one-click deploy from a repo URL directly. Manual steps:
+
+1. Go to [zeabur.com](https://zeabur.com) → **New Project** → **Deploy from GitHub**
+2. Select `P0lar1zzZ/Ombre-Brain` — Zeabur auto-detects `zbpack.json`
+3. Set variables as needed in **Variables**:
+   - `OMBRE_API_KEY` (optional, any OpenAI-compatible key)
+   - `OMBRE_BASE_URL` (optional, e.g. `https://api.deepseek.com/v1` or `http://ip:port/v1`)
+4. Mount volume `ombre-buckets` → `/app/buckets` in **Volumes**
+5. MCP URL after deploy: `https://<your-domain>/mcp`
 
 ### Session Start Hook（自动 breath）
 

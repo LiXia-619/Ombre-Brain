@@ -245,7 +245,7 @@ $$base\_score = Importance \times activation\_count^{0.3} \times e^{-\lambda \ti
 
 `zbpack.json` is included. After clicking:
 1. (Optional) Set `OMBRE_API_KEY` in the Zeabur console (omit to fall back to local keyword extraction)
-2. (Optional) Set `OMBRE_BASE_URL` to any OpenAI-compatible endpoint (e.g. `https://api.deepseek.com/v1`, `http://123.1.1.1:7689/v1`, `http://your-ollama:11434/v1`)
+2. (Optional) Set `OMBRE_BASE_URL` to any OpenAI-compatible endpoint (e.g. `https://api.deepseek.com/v1`, `http://自定义:自定义/v1`, `http://your-ollama:11434/v1`)
 3. Volume `ombre-buckets` mounts at `/app/buckets`
 4. After deploy, your MCP URL is `https://<your-domain>/mcp` — add it to Claude Desktop / Claude.ai MCP settings
 

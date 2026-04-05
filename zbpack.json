@@ -22,6 +22,7 @@
   "env": {
     "OMBRE_TRANSPORT": "streamable-http",
     "OMBRE_API_KEY": "${OMBRE_API_KEY}",
+    "OMBRE_BASE_URL": "${OMBRE_BASE_URL}",
     "OMBRE_BUCKETS_DIR": "/app/buckets"
   }
 }

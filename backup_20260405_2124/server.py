@@ -117,23 +117,20 @@ async def _merge_or_create(
 
     if existing and existing[0].get("score", 0) > config.get("merge_threshold", 75):
         bucket = existing[0]
-        # --- Never merge into pinned/protected buckets ---
-        # --- 不合并到钉选/保护桶 ---
-        if not (bucket["metadata"].get("pinned") or bucket["metadata"].get("protected")):
-            try:
-                merged = await dehydrator.merge(bucket["content"], content)
-                await bucket_mgr.update(
-                    bucket["id"],
-                    content=merged,
-                    tags=list(set(bucket["metadata"].get("tags", []) + tags)),
-                    importance=max(bucket["metadata"].get("importance", 5), importance),
-                    domain=list(set(bucket["metadata"].get("domain", []) + domain)),
-                    valence=valence,
-                    arousal=arousal,
-                )
-                return bucket["metadata"].get("name", bucket["id"]), True
-            except Exception as e:
-                logger.warning(f"Merge failed, creating new / 合并失败，新建: {e}")
+        try:
+            merged = await dehydrator.merge(bucket["content"], content)
+            await bucket_mgr.update(
+                bucket["id"],
+                content=merged,
+                tags=list(set(bucket["metadata"].get("tags", []) + tags)),
+                importance=max(bucket["metadata"].get("importance", 5), importance),
+                domain=list(set(bucket["metadata"].get("domain", []) + domain)),
+                valence=valence,
+                arousal=arousal,
+            )
+            return bucket["metadata"].get("name", bucket["id"]), True
+        except Exception as e:
+            logger.warning(f"Merge failed, creating new / 合并失败，新建: {e}")
 
     bucket_id = await bucket_mgr.create(
         content=content,
@@ -164,7 +161,7 @@ async def breath(
     valence: float = -1,
     arousal: float = -1,
 ) -> str:
-    """检索/浮现记忆。空query=自动浮现,有query=关键词检索。domain逗号分隔,valence/arousal 0~1(-1忽略)。"""
+    """检索记忆或浮现未解决记忆。query 为空时自动推送权重最高的未解决桶；有 query 时按关键词+情感检索。domain 逗号分隔，valence/arousal 传 0~1 启用情感共鸣，-1 忽略。"""
     await decay_engine.ensure_started()
 
     # --- No args: surfacing mode (weight pool active push) ---
@@ -176,30 +173,13 @@ async def breath(
             logger.error(f"Failed to list buckets for surfacing / 浮现列桶失败: {e}")
             return "记忆系统暂时无法访问。"
 
-        # --- Pinned/protected buckets: always surface as core principles ---
-        # --- 钉选桶：作为核心准则，始终浮现 ---
-        pinned_buckets = [
-            b for b in all_buckets
-            if b["metadata"].get("pinned") or b["metadata"].get("protected")
-        ]
-        pinned_results = []
-        for b in pinned_buckets:
-            try:
-                summary = await dehydrator.dehydrate(b["content"], b["metadata"])
-                pinned_results.append(f"📌 [核心准则] {summary}")
-            except Exception as e:
-                logger.warning(f"Failed to dehydrate pinned bucket / 钉选桶脱水失败: {e}")
-                continue
-
-        # --- Unresolved buckets: surface top 2 by weight ---
-        # --- 未解决桶：按权重浮现前 2 条 ---
         unresolved = [
             b for b in all_buckets
             if not b["metadata"].get("resolved", False)
             and b["metadata"].get("type") != "permanent"
-            and not b["metadata"].get("pinned", False)
-            and not b["metadata"].get("protected", False)
         ]
+        if not unresolved:
+            return "权重池平静，没有需要处理的记忆。"
 
         scored = sorted(
             unresolved,
@@ -207,26 +187,19 @@ async def breath(
             reverse=True,
         )
         top = scored[:2]
-        dynamic_results = []
+        results = []
         for b in top:
             try:
                 summary = await dehydrator.dehydrate(b["content"], b["metadata"])
                 await bucket_mgr.touch(b["id"])
                 score = decay_engine.calculate_score(b["metadata"])
-                dynamic_results.append(f"[权重:{score:.2f}] {summary}")
+                results.append(f"[权重:{score:.2f}] {summary}")
             except Exception as e:
                 logger.warning(f"Failed to dehydrate surfaced bucket / 浮现脱水失败: {e}")
                 continue
-
-        if not pinned_results and not dynamic_results:
+        if not results:
             return "权重池平静，没有需要处理的记忆。"
-
-        parts = []
-        if pinned_results:
-            parts.append("=== 核心准则 ===\n" + "\n---\n".join(pinned_results))
-        if dynamic_results:
-            parts.append("=== 浮现记忆 ===\n" + "\n---\n".join(dynamic_results))
-        return "\n\n".join(parts)
+        return "=== 浮现记忆 ===\n" + "\n---\n".join(results)
 
     # --- With args: search mode / 有参数：检索模式 ---
     domain_filter = [d.strip() for d in domain.split(",") if d.strip()] or None
@@ -291,9 +264,8 @@ async def hold(
     content: str,
     tags: str = "",
     importance: int = 5,
-    pinned: bool = False,
 ) -> str:
-    """存储单条记忆,自动打标+合并。tags逗号分隔,importance 1-10。pinned=True创建永久钉选桶。"""
+    """存储单条记忆。自动打标+合并相似桶。tags 逗号分隔，importance 1-10。"""
     await decay_engine.ensure_started()
 
     # --- Input validation / 输入校验 ---
@@ -321,21 +293,6 @@ async def hold(
 
     all_tags = list(dict.fromkeys(auto_tags + extra_tags))
 
-    # --- Pinned buckets bypass merge and are created directly ---
-    # --- 钉选桶跳过合并，直接新建 ---
-    if pinned:
-        bucket_id = await bucket_mgr.create(
-            content=content,
-            tags=all_tags,
-            importance=10,
-            domain=domain,
-            valence=valence,
-            arousal=arousal,
-            name=suggested_name or None,
-            pinned=True,
-        )
-        return f"📌钉选→{bucket_id} {','.join(domain)}"
-
     # --- Step 2: merge or create / 合并或新建 ---
     result_name, is_merged = await _merge_or_create(
         content=content,
@@ -347,8 +304,15 @@ async def hold(
         name=suggested_name,
     )
 
-    action = "合并→" if is_merged else "新建→"
-    return f"{action}{result_name} {','.join(domain)}"
+    if is_merged:
+        return (
+            f"已合并到现有记忆桶: {result_name}\n"
+            f"主题域: {', '.join(domain)} | 情感: V{valence:.1f}/A{arousal:.1f}"
+        )
+    return (
+        f"已创建新记忆桶: {result_name}\n"
+        f"主题域: {', '.join(domain)} | 情感: V{valence:.1f}/A{arousal:.1f} | 标签: {', '.join(all_tags)}"
+    )
 
 
 # =============================================================
@@ -357,38 +321,11 @@ async def hold(
 # =============================================================
 @mcp.tool()
 async def grow(content: str) -> str:
-    """日记归档,自动拆分为多桶。短内容(<30字)走快速路径。"""
+    """日记归档。自动拆分长内容为多个记忆桶。"""
     await decay_engine.ensure_started()
 
     if not content or not content.strip():
         return "内容为空，无法整理。"
-
-    # --- Short content fast path: skip digest, use hold logic directly ---
-    # --- 短内容快速路径：跳过 digest 拆分，直接走 hold 逻辑省一次 API ---
-    # For very short inputs (like "1"), calling digest is wasteful:
-    # it sends the full DIGEST_PROMPT (~800 tokens) to DeepSeek for nothing.
-    # Instead, run analyze + create directly.
-    if len(content.strip()) < 30:
-        logger.info(f"grow short-content fast path: {len(content.strip())} chars")
-        try:
-            analysis = await dehydrator.analyze(content)
-        except Exception as e:
-            logger.warning(f"Fast-path analyze failed / 快速路径打标失败: {e}")
-            analysis = {
-                "domain": ["未分类"], "valence": 0.5, "arousal": 0.3,
-                "tags": [], "suggested_name": "",
-            }
-        result_name, is_merged = await _merge_or_create(
-            content=content.strip(),
-            tags=analysis.get("tags", []),
-            importance=analysis.get("importance", 5) if isinstance(analysis.get("importance"), int) else 5,
-            domain=analysis.get("domain", ["未分类"]),
-            valence=analysis.get("valence", 0.5),
-            arousal=analysis.get("arousal", 0.3),
-            name=analysis.get("suggested_name", ""),
-        )
-        action = "合并" if is_merged else "新建"
-        return f"{action} → {result_name} | {','.join(analysis.get('domain', []))} V{analysis.get('valence', 0.5):.1f}/A{analysis.get('arousal', 0.3):.1f}"
 
     # --- Step 1: let API split and organize / 让 API 拆分整理 ---
     try:
@@ -419,19 +356,24 @@ async def grow(content: str) -> str:
             )
 
             if is_merged:
-                results.append(f"📎{result_name}")
+                results.append(f"  📎 合并 → {result_name}")
                 merged += 1
             else:
-                results.append(f"📝{item.get('name', result_name)}")
+                domains_str = ",".join(item.get("domain", []))
+                results.append(
+                    f"  📝 新建 [{item.get('name', result_name)}] "
+                    f"主题:{domains_str} V{item.get('valence', 0.5):.1f}/A{item.get('arousal', 0.3):.1f}"
+                )
                 created += 1
         except Exception as e:
             logger.warning(
                 f"Failed to process diary item / 日记条目处理失败: "
                 f"{item.get('name', '?')}: {e}"
             )
-            results.append(f"⚠️{item.get('name', '?')}")
+            results.append(f"  ⚠️ 失败: {item.get('name', '未知条目')}")
 
-    return f"{len(items)}条|新{created}合{merged}\n" + "\n".join(results)
+    summary = f"=== 日记整理完成 ===\n拆分为 {len(items)} 条 | 新建 {created} 桶 | 合并 {merged} 桶\n"
+    return summary + "\n".join(results)
 
 
 # =============================================================
@@ -450,10 +392,9 @@ async def trace(
     importance: int = -1,
     tags: str = "",
     resolved: int = -1,
-    pinned: int = -1,
     delete: bool = False,
 ) -> str:
-    """修改记忆元数据。resolved=1沉底/0激活,pinned=1钉选/0取消,delete=True删除。只传需改的,-1或空=不改。"""
+    """修改记忆元数据。resolved=1 标记已解决（桶权重骤降沉底），resolved=0 重新激活，delete=True 删除桶。其余字段只传需改的，-1 或空串表示不改。"""
 
     if not bucket_id or not bucket_id.strip():
         return "请提供有效的 bucket_id。"
@@ -483,10 +424,6 @@ async def trace(
         updates["tags"] = [t.strip() for t in tags.split(",") if t.strip()]
     if resolved in (0, 1):
         updates["resolved"] = bool(resolved)
-    if pinned in (0, 1):
-        updates["pinned"] = bool(pinned)
-        if pinned == 1:
-            updates["importance"] = 10  # pinned → lock importance
 
     if not updates:
         return "没有任何字段需要修改。"
@@ -512,7 +449,7 @@ async def trace(
 # =============================================================
 @mcp.tool()
 async def pulse(include_archive: bool = False) -> str:
-    """系统状态+记忆桶列表。include_archive=True含归档。"""
+    """系统状态和所有记忆桶摘要。include_archive=True 时包含归档桶。"""
     try:
         stats = await bucket_mgr.get_stats()
     except Exception as e:
@@ -539,9 +476,7 @@ async def pulse(include_archive: bool = False) -> str:
     lines = []
     for b in buckets:
         meta = b.get("metadata", {})
-        if meta.get("pinned") or meta.get("protected"):
-            icon = "📌"
-        elif meta.get("type") == "permanent":
+        if meta.get("type") == "permanent":
             icon = "📦"
         elif meta.get("type") == "archived":
             icon = "🗄️"

@@ -244,10 +244,10 @@ $$base\_score = Importance \times activation\_count^{0.3} \times e^{-\lambda \ti
 
 1. **创建项目 / Create project**
    - 打开 [zeabur.com](https://zeabur.com) → 购买一台服务器 → **New Project** → **Deploy from GitHub**
-   - 选择 `P0lar1zzZ/Ombre-Brain`（需先 Fork 到自己账号）
+   - 先 Fork 本仓库到自己 GitHub 账号，然后在 Zeabur 选择 `你的用户名/Ombre-Brain`
    - Zeabur 会自动检测到根目录的 `Dockerfile` 并使用 Docker 方式构建
    - Go to [zeabur.com](https://zeabur.com) → buy a server → **New Project** → **Deploy from GitHub**
-   - Select `P0lar1zzZ/Ombre-Brain` (fork to your account first)
+   - Fork this repo first, then select `your-username/Ombre-Brain` in Zeabur
    - Zeabur auto-detects the `Dockerfile` in root and builds via Docker
 
 2. **设置环境变量 / Set environment variables**（服务页面 → **Variables** 标签页）

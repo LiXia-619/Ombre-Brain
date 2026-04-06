@@ -240,25 +240,49 @@ $$base\_score = Importance \times activation\_count^{0.3} \times e^{-\lambda \ti
 > 💡 **Zeabur 的定价模式**：Zeabur 是「买 VPS + 平台托管」，你先购买一台服务器（最低腾讯云新加坡 $2/mo、火山引擎 $3/mo），Volume 直接挂在该服务器上，**数据天然持久化，无丢失问题**。另需订阅 Zeabur 管理方案（Developer $5/mo），总计约 $7-8/mo 起。
 > **Zeabur pricing model**: You buy a VPS first (cheapest: Tencent Cloud Singapore ~$2/mo, Volcano Engine ~$3/mo), then add Zeabur's Developer plan ($5/mo) for management. Volumes mount directly on your server — **data is always persistent, no cold-start data loss**. Total ~$7-8/mo minimum.
 
-Zeabur 暂不支持直接从 repo URL 一键部署，请手动操作：
+**步骤 / Steps：**
 
-1. 打开 [zeabur.com](https://zeabur.com) → 购买一台服务器 → **New Project** → **Deploy from GitHub**
-2. 选择 `P0lar1zzZ/Ombre-Brain`，Zeabur 会自动识别根目录的 `zbpack.json`
-3. 在 **Variables** 里按需设置：
-   - `OMBRE_API_KEY`（可选，OpenAI 兼容 key）
-   - `OMBRE_BASE_URL`（可选，如 `https://api.deepseek.com/v1` / `http://ip:port/v1`）
-4. 在 **Volumes** 里挂载 `ombre-buckets` → `/app/buckets`
-5. 部署后 MCP URL：`https://<你的域名>/mcp`
+1. **创建项目 / Create project**
+   - 打开 [zeabur.com](https://zeabur.com) → 购买一台服务器 → **New Project** → **Deploy from GitHub**
+   - 选择 `P0lar1zzZ/Ombre-Brain`（需先 Fork 到自己账号）
+   - Zeabur 会自动检测到根目录的 `Dockerfile` 并使用 Docker 方式构建
+   - Go to [zeabur.com](https://zeabur.com) → buy a server → **New Project** → **Deploy from GitHub**
+   - Select `P0lar1zzZ/Ombre-Brain` (fork to your account first)
+   - Zeabur auto-detects the `Dockerfile` in root and builds via Docker
 
-Zeabur doesn't support one-click deploy from a repo URL directly. Manual steps:
+2. **设置环境变量 / Set environment variables**（服务页面 → **Variables** 标签页）
+   - `OMBRE_API_KEY`（可选）— LLM API 密钥，不填则自动降级为本地关键词提取
+   - `OMBRE_BASE_URL`（可选）— API 地址，如 `https://api.deepseek.com/v1`
 
-1. Go to [zeabur.com](https://zeabur.com) → buy a server → **New Project** → **Deploy from GitHub**
-2. Select `P0lar1zzZ/Ombre-Brain` — Zeabur auto-detects `zbpack.json`
-3. Set variables as needed in **Variables**:
-   - `OMBRE_API_KEY` (optional, any OpenAI-compatible key)
-   - `OMBRE_BASE_URL` (optional, e.g. `https://api.deepseek.com/v1` or `http://ip:port/v1`)
-4. Mount volume `ombre-buckets` → `/app/buckets` in **Volumes**
-5. MCP URL after deploy: `https://<your-domain>/mcp`
+   > ⚠️ **不需要**手动设置 `OMBRE_TRANSPORT` 和 `OMBRE_BUCKETS_DIR`，Dockerfile 里已经设好了默认值。Zeabur 对单阶段 Dockerfile 会自动注入控制台设置的环境变量。
+   > You do **NOT** need to set `OMBRE_TRANSPORT` or `OMBRE_BUCKETS_DIR` — defaults are baked into the Dockerfile. Zeabur auto-injects dashboard env vars for single-stage Dockerfiles.
+
+3. **挂载持久存储 / Mount persistent volume**（服务页面 → **Volumes** 标签页）
+   - Volume ID：填 `ombre-buckets`（或任意名）
+   - 挂载路径 / Path：**`/app/buckets`**
+   - ⚠️ 不挂载的话，每次重新部署记忆数据会丢失
+   - ⚠️ Without this, memory data is lost on every redeploy
+
+4. **配置端口 / Configure port**（服务页面 → **Networking** 标签页）
+   - Port Name：`web`（或任意名）
+   - Port：**`8000`**
+   - Port Type：**`HTTP`**
+   - 然后点 **Generate Domain** 生成一个 `xxx.zeabur.app` 域名
+   - Then click **Generate Domain** to get a `xxx.zeabur.app` domain
+
+5. **验证 / Verify**
+   - 访问 `https://<你的域名>.zeabur.app/health`，应返回 JSON
+   - Visit `https://<your-domain>.zeabur.app/health` — should return JSON
+   - 最终 MCP 地址 / MCP URL：`https://<你的域名>.zeabur.app/mcp`
+
+**常见问题 / Troubleshooting：**
+
+| 现象 Symptom | 原因 Cause | 解决 Fix |
+|---|---|---|
+| 域名无法访问 / Domain unreachable | 没配端口 / Port not configured | Networking 标签页加 port 8000 (HTTP) |
+| 构建失败 / Build failed | Dockerfile 未被识别 / Dockerfile not detected | 确认仓库根目录有 `Dockerfile`（大小写敏感） |
+| 服务启动后立刻退出 | `OMBRE_TRANSPORT` 被覆盖为 `stdio` | 检查 Variables 里有没有多余的 `OMBRE_TRANSPORT=stdio`，删掉即可 |
+| 重启后记忆丢失 / Data lost on restart | Volume 未挂载 | Volumes 标签页挂载到 `/app/buckets` |
 
 ### Session Start Hook（自动 breath）
 

@@ -19,13 +19,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY *.py .
 COPY config.example.yaml ./config.yaml
 
-# Persistent mount point: bucket data from host
-# 持久化挂载点：记忆数据从宿主机挂进来
-VOLUME ["/data"]
+# Persistent mount point: bucket data
+# 持久化挂载点：记忆数据
+VOLUME ["/app/buckets"]
 
 # Default to streamable-http for container (remote access)
 # 容器场景默认用 streamable-http
 ENV OMBRE_TRANSPORT=streamable-http
+ENV OMBRE_BUCKETS_DIR=/app/buckets
 
 EXPOSE 8000
 

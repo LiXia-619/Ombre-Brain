@@ -712,6 +712,7 @@ async def static_asset(request: Request) -> Response:
         "icon.svg": "image/svg+xml",
         "favicon.svg": "image/svg+xml",
         "manifest.json": "application/manifest+json",
+        "RRPL.ttf": "font/truetype",
     }
     if name not in allowed:
         return JSONResponse({"error": "not found"}, status_code=404)

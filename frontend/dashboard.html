@@ -1265,11 +1265,11 @@
   </div>
   <div class="search-bar">
     <input type="text" id="search-input" placeholder="搜索记忆…" onkeydown="if(event.key==='Enter')doSearch()" />
-    <button onclick="doSearch()" title="搜索">搜索</button>
+    <button onclick="doSearch()" title="搜索"><i data-lucide="search"></i></button>
   </div>
   <div class="header-actions">
-    <button onclick="openFeedback()" title="给作者反馈">反馈</button>
-    <button onclick="doLogout()" title="退出登录">退出</button>
+    <button onclick="openFeedback()" title="给作者反馈"><i data-lucide="message-circle"></i></button>
+    <button onclick="doLogout()" title="退出登录"><i data-lucide="log-out"></i></button>
   </div>
 </div>
 
@@ -1298,7 +1298,7 @@
     <summary style="cursor:pointer;font-size:13px;color:var(--text-dim);padding:6px 0;">
       <i data-lucide="moon-off" style="width:14px;height:14px;vertical-align:-2px;"></i>
       已主动遗忘 <span id="forgotten-count">0</span> 条
-      <button onclick="event.preventDefault(); bucketsForgetAllow();" style="margin-left:12px;font-size:11px;padding:3px 10px;">全部允许浮现</button>
+      <button onclick="event.preventDefault(); bucketsForgetAllow();" title="全部允许浮现" style="margin-left:12px;font-size:11px;padding:3px 8px;"><i data-lucide="eye"></i></button>
     </summary>
     <div id="forgotten-list" style="margin-top:10px;"></div>
   </details>
@@ -1315,7 +1315,7 @@
     style="padding:5px 16px;font-size:12px;opacity:0.4;transition:opacity 0.2s;">
     彻底清除所选
   </button>
-  <button onclick="exitPurgeMode()" style="background:none;border:1px solid var(--border);color:var(--text-dim);border-radius:2px;padding:5px 12px;font-size:12px;cursor:pointer;">退出清理模式</button>
+  <button onclick="exitPurgeMode()" title="退出清理模式" style="background:none;border:1px solid var(--border);color:var(--text-dim);border-radius:2px;padding:5px 9px;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;"><i data-lucide="x-circle"></i> 退出</button>
 </div>
 
 
@@ -1339,7 +1339,7 @@
     <input type="number" id="breath-valence" placeholder="0~1" min="0" max="1" step="0.1" style="width:80px" />
     <label>Arousal</label>
     <input type="number" id="breath-arousal" placeholder="0~1" min="0" max="1" step="0.1" style="width:80px" />
-    <button onclick="runBreathDebug()">模拟 Breath</button>
+    <button onclick="runBreathDebug()" title="模拟 Breath"><i data-lucide="wind"></i></button>
   </div>
 
   <div class="breath-info" id="breath-info" style="display:none"></div>
@@ -1399,9 +1399,9 @@
 
       <!-- 主功能键（momentary） -->
       <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
-        <button class="btn-primary" onclick="toolTestBreath()">试一次 breath</button>
-        <button onclick="toolGithubSync()">立即备份到 GitHub ↑</button>
-        <button onclick="loadToolsPanel()">刷新状态</button>
+        <button class="btn-primary" onclick="toolTestBreath()" title="试一次 breath"><i data-lucide="wind"></i></button>
+        <button onclick="toolGithubSync()" title="立即备份到 GitHub"><i data-lucide="upload-cloud"></i></button>
+        <button onclick="loadToolsPanel()" title="刷新状态"><i data-lucide="refresh-cw"></i></button>
       </div>
       <div id="tools-action-result" style="margin-top:12px;font-size:12px;color:var(--text-dim);line-height:1.8;"></div>
 
@@ -1450,7 +1450,7 @@
     <div id="import-errors" style="display:none;margin:12px 0;padding:12px;background:var(--surface);border-radius:8px;font-size:12px;color:var(--negative);max-height:120px;overflow-y:auto;"></div>
 
     <div id="import-results-section" style="margin:20px 0;">
-      <h3>已导入记忆 <button onclick="loadImportResults()" style="font-size:12px;padding:2px 10px;">刷新</button></h3>
+      <h3>已导入记忆 <button onclick="loadImportResults()" title="刷新" style="font-size:12px;padding:2px 8px;"><i data-lucide="refresh-cw"></i></button></h3>
       <div id="import-results-list" style="max-height:500px;overflow-y:auto;"></div>
     </div>
 
@@ -1485,7 +1485,7 @@
         </select>
         <label>行数</label>
         <input type="number" id="logs-limit" value="200" min="20" max="2000" style="flex:0 0 110px;" />
-        <button class="btn-secondary" onclick="loadLogs()" style="padding:8px 18px;font-size:12px;">刷新</button>
+        <button class="btn-secondary" onclick="loadLogs()" title="刷新日志" style="padding:8px 14px;font-size:12px;"><i data-lucide="refresh-cw"></i></button>
         <span id="logs-meta" style="font-size:11px;color:var(--text-dim);margin-left:auto;"></span>
       </div>
       <pre id="logs-output" style="background:var(--surface-solid);color:var(--text);padding:16px;border-radius:11px;font-size:11px;max-height:60vh;overflow:auto;line-height:1.55;white-space:pre-wrap;word-break:break-all;box-shadow:inset 2px 2px 5px var(--shadow-dark-subtle),inset -2px -2px 4px var(--shadow-light);font-family:'Share Tech Mono','SF Mono',Consolas,monospace;">点击刷新加载日志…</pre>
@@ -1507,8 +1507,8 @@
           <option value="E">E + F</option>
           <option value="F">仅 F</option>
         </select>
-        <button class="btn-secondary" onclick="loadOBErrors()" style="padding:6px 14px;font-size:12px;">刷新</button>
-        <button onclick="clearOBErrors()" style="padding:6px 14px;font-size:12px;background:none;border:1px solid var(--border);color:var(--text-dim);border-radius:2px;cursor:pointer;">标记已读 / 清空</button>
+        <button class="btn-secondary" onclick="loadOBErrors()" title="刷新错误" style="padding:6px 10px;font-size:12px;"><i data-lucide="refresh-cw"></i></button>
+        <button onclick="clearOBErrors()" title="标记已读 / 清空" style="padding:6px 10px;font-size:12px;background:none;border:1px solid var(--border);color:var(--text-dim);border-radius:2px;cursor:pointer;"><i data-lucide="check-square"></i></button>
         <span id="errors-meta" style="font-size:11px;color:var(--text-dim);margin-left:auto;"></span>
       </div>
       <div id="errors-list" style="margin-top:12px;display:flex;flex-direction:column;gap:10px;">
@@ -1525,7 +1525,7 @@
     <div class="config-section">
       <h3>计划 / Plans <span style="font-size:11px;color:var(--text-light);font-style:italic;font-family:'Cormorant Garamond',serif;">— what I promised, what I'm carrying</span></h3>
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
-        <button class="btn-secondary" onclick="loadPlans()" style="padding:6px 14px;font-size:12px;"><i data-lucide="refresh-cw"></i> 刷新</button>
+        <button class="btn-secondary" onclick="loadPlans()" title="刷新" style="padding:6px 10px;font-size:12px;"><i data-lucide="refresh-cw"></i></button>
         <span id="plan-stats" style="font-size:12px;color:var(--text-dim);"></span>
         <span style="margin-left:auto;font-size:11px;color:var(--text-light);display:inline-flex;align-items:center;gap:4px;"><svg class="icon icon-ok" aria-hidden="true"><use href="#i-check"></use></svg> 完成 / <svg class="icon icon-err" aria-hidden="true"><use href="#i-x"></use></svg> 放弃 / <svg class="icon" aria-hidden="true" style="transform:scaleX(-1)"><use href="#i-clock"></use></svg> 重新激活</span>
       </div>
@@ -1568,7 +1568,7 @@
         <textarea id="letter-content" placeholder="…" style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:12px 14px;border-radius:2px;font-family:inherit;font-size:13px;line-height:1.7;min-height:180px;resize:vertical;box-shadow:inset 2px 2px 4px var(--shadow-dark-subtle), inset -2px -2px 4px var(--shadow-light);"></textarea>
       </div>
       <div style="display:flex;gap:14px;align-items:center;margin-top:6px;">
-        <button class="btn-primary" onclick="sendLetter()">寄出</button>
+        <button class="btn-primary" onclick="sendLetter()" title="寄出"><i data-lucide="send"></i></button>
         <span id="letter-status" style="font-size:12px;color:var(--text-dim);"></span>
       </div>
     </div>
@@ -1582,7 +1582,7 @@
           <option value="user">仅 YOU</option>
           <option value="claude">仅 AI</option>
         </select>
-        <button class="btn-secondary" onclick="loadLetters()" style="padding:8px 18px;font-size:12px;">刷新</button>
+        <button class="btn-secondary" onclick="loadLetters()" title="刷新" style="padding:8px 14px;font-size:12px;"><i data-lucide="refresh-cw"></i></button>
         <span id="letter-count" style="font-size:11px;color:var(--text-dim);margin-left:auto;"></span>
       </div>
       <div id="letters-list" style="display:flex;flex-direction:column;gap:14px;margin-top:6px;">
@@ -1605,7 +1605,7 @@
       <div id="anchors-list" style="display:flex;flex-direction:column;gap:10px;">
         <div style="color:var(--text-dim);font-size:12px;">加载中…</div>
       </div>
-      <button class="btn-secondary" onclick="loadAnchorsView()" style="margin-top:14px;padding:6px 16px;font-size:12px;">刷新</button>
+      <button class="btn-secondary" onclick="loadAnchorsView()" title="刷新" style="margin-top:14px;padding:6px 12px;font-size:12px;"><i data-lucide="refresh-cw"></i></button>
     </div>
   </div>
 </div>
@@ -1644,7 +1644,7 @@
           <input type="text" id="settings-human-name" placeholder="人类" maxlength="20" style="width:180px;" />
         </div>
         <div style="display:flex;gap:8px;align-items:center;margin-top:6px;">
-          <button class="btn-primary" onclick="saveHumanName()">保存</button>
+          <button class="btn-primary" onclick="saveHumanName()" title="保存"><i data-lucide="check"></i></button>
           <span id="settings-human-msg" style="font-size:12px;color:var(--text-dim);"></span>
         </div>
       </div>
@@ -1658,7 +1658,7 @@
           <div class="config-row"><label>当前密码</label><input type="password" id="settings-current-pwd" placeholder="当前密码" /></div>
           <div class="config-row"><label>新密码</label><input type="password" id="settings-new-pwd" placeholder="新密码（至少6位）" /></div>
           <div class="config-row"><label>确认</label><input type="password" id="settings-new-pwd2" placeholder="再次输入新密码" /></div>
-          <button class="btn-primary" onclick="changePassword()" style="margin-top:4px;">保存</button>
+          <button class="btn-primary" onclick="changePassword()" title="保存密码" style="margin-top:4px;"><i data-lucide="check"></i></button>
           <div id="settings-pwd-msg" style="margin-top:10px;font-size:13px;"></div>
         </div>
       </div>
@@ -1669,7 +1669,7 @@
         <div id="settings-qa-form">
           <div class="config-row"><label>安全问题</label><input type="text" id="settings-qa-q" placeholder="例：我第一只猫叫什么" /></div>
           <div class="config-row"><label>答案</label><input type="text" id="settings-qa-a" placeholder="答案（不区分大小写）" /></div>
-          <button class="btn-primary" onclick="saveSecurityQuestion()" style="margin-top:4px;">保存急救问题</button>
+          <button class="btn-primary" onclick="saveSecurityQuestion()" title="保存急救问题" style="margin-top:4px;"><i data-lucide="shield"></i></button>
           <div id="settings-qa-msg" style="margin-top:10px;font-size:13px;"></div>
         </div>
       </div>
@@ -1693,7 +1693,7 @@
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:8px 12px;background:var(--surface-solid);border-radius:11px;box-shadow:4px 4px 10px var(--shadow-dark-subtle),-3px -3px 8px var(--shadow-light);">
           <span id="tunnel-status-dot" style="width:10px;height:10px;border-radius:50%;background:var(--text-dim);flex-shrink:0;transition:background 0.3s;"></span>
           <span id="tunnel-status-text" style="font-size:12px;color:var(--text-dim);flex:1;">未运行</span>
-          <button id="tunnel-toggle-btn" class="btn-primary" onclick="toggleTunnel()" style="padding:4px 12px;font-size:12px;">启动</button>
+          <button id="tunnel-toggle-btn" class="btn-primary" onclick="toggleTunnel()" title="启动/停止隧道" style="padding:4px 10px;font-size:12px;"><i data-lucide="play"></i></button>
         </div>
 
         <!-- Error/log output -->
@@ -1708,14 +1708,14 @@
           <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;">
             <input type="checkbox" id="tunnel-autostart" /> 启动时自动连接
           </label>
-          <button class="btn-primary" onclick="saveTunnelToken()" style="padding:5px 12px;font-size:12px;">保存 Token</button>
+          <button class="btn-primary" onclick="saveTunnelToken()" title="保存 Token" style="padding:5px 10px;font-size:12px;"><i data-lucide="key"></i></button>
         </div>
         <div id="tunnel-msg" style="margin-top:8px;font-size:12px;"></div>
       </div>
 
       <div>
         <div style="font-weight:600;font-size:13px;margin-bottom:6px;">退出登录</div>
-        <button class="btn-danger" onclick="doLogout()" style="padding:6px 14px;font-size:12px;">退出登录</button>
+        <button class="btn-danger" onclick="doLogout()" title="退出登录" style="padding:6px 10px;font-size:12px;"><i data-lucide="log-out"></i></button>
       </div>
     </div>
 
@@ -1726,7 +1726,7 @@
       <div style="margin-bottom:18px;">
         <div style="font-weight:600;font-size:13px;margin-bottom:6px;">服务状态</div>
         <div id="settings-status" style="font-size:13px;color:var(--text-dim);line-height:2;">加载中…</div>
-        <button onclick="loadSettingsStatus()" style="margin-top:8px;font-size:12px;padding:4px 12px;">刷新</button>
+        <button onclick="loadSettingsStatus()" title="刷新" style="margin-top:8px;font-size:12px;padding:4px 9px;"><i data-lucide="refresh-cw"></i></button>
       </div>
 
       <div>
@@ -1740,8 +1740,8 @@
           <input type="text" id="settings-host-vault" placeholder="例如 /Users/you/Obsidian/Ombre Brain" style="flex:1;" />
         </div>
         <div style="display:flex;gap:8px;align-items:center;margin-top:6px;">
-          <button class="btn-primary" onclick="saveHostVault()">保存</button>
-          <button onclick="loadHostVault()" style="font-size:12px;padding:4px 12px;">重新加载</button>
+          <button class="btn-primary" onclick="saveHostVault()" title="保存"><i data-lucide="check"></i></button>
+          <button onclick="loadHostVault()" title="重新加载" style="font-size:12px;padding:4px 9px;"><i data-lucide="refresh-cw"></i></button>
           <span id="settings-host-vault-msg" style="font-size:12px;"></span>
         </div>
       </div>
@@ -1767,15 +1767,15 @@
         <div class="config-row" style="align-items:center;">
           <label>Model</label>
           <input type="text" id="cfg-dehy-model" placeholder="gemini-2.5-flash-lite" style="flex:1;" />
-          <button type="button" onclick="fetchModels('dehy')" style="margin-left:6px;padding:6px 10px;font-size:11px;white-space:nowrap;">获取模型 ↓</button>
+          <button type="button" onclick="fetchModels('dehy')" title="获取模型列表" style="margin-left:6px;padding:6px 8px;font-size:11px;white-space:nowrap;"><i data-lucide="download"></i></button>
         </div>
         <div id="cfg-dehy-model-list" class="model-list-dropdown"></div>
         <div class="config-row" id="cfg-dehy-url-row"><label>Base URL</label><input type="text" id="cfg-dehy-url" placeholder="https://..." /></div>
         <div class="config-row" style="align-items:center;">
           <label>API Key</label>
           <input type="password" id="cfg-dehy-key" placeholder="当前: 加载中…" style="flex:1;" />
-          <button type="button" onclick="saveCompressKey()" style="margin-left:8px;padding:6px 14px;font-size:12px;white-space:nowrap;">保存 Key</button>
-          <button type="button" onclick="testDehydrationKey()" style="margin-left:4px;padding:6px 12px;font-size:12px;white-space:nowrap;">测试</button>
+          <button type="button" onclick="saveCompressKey()" title="保存 Key" style="margin-left:8px;padding:6px 10px;font-size:12px;white-space:nowrap;"><i data-lucide="key"></i></button>
+          <button type="button" onclick="testDehydrationKey()" title="测试连接" style="margin-left:4px;padding:6px 10px;font-size:12px;white-space:nowrap;"><i data-lucide="zap"></i></button>
           <span id="dehy-key-msg" style="margin-left:8px;font-size:11px;"></span>
         </div>
         <div style="margin-top:-4px;margin-bottom:12px;padding-left:122px;font-size:11px;color:var(--text-light);">留空不改。Key 保存后立即生效并写入 .env（重启持久）。</div>
@@ -1796,7 +1796,7 @@
         <div class="config-row" style="align-items:center;">
           <label>API Key</label>
           <input type="password" id="cfg-emb-api-key" placeholder="当前: 加载中…" style="flex:1;" />
-          <button type="button" onclick="saveEmbedKey()" style="margin-left:8px;padding:6px 14px;font-size:12px;white-space:nowrap;">保存 Key</button>
+          <button type="button" onclick="saveEmbedKey()" title="保存 Key" style="margin-left:8px;padding:6px 10px;font-size:12px;white-space:nowrap;"><i data-lucide="key"></i></button>
           <span id="emb-key-msg" style="margin-left:8px;font-size:11px;"></span>
         </div>
         <div class="config-row">
@@ -1826,7 +1826,7 @@
         <div class="config-row" style="align-items:center;">
           <label>Model</label>
           <input type="text" id="cfg-emb-model" placeholder="gemini-embedding-001" style="flex:1;" />
-          <button type="button" onclick="fetchModels('emb')" style="margin-left:6px;padding:6px 10px;font-size:11px;white-space:nowrap;">获取模型 ↓</button>
+          <button type="button" onclick="fetchModels('emb')" title="获取模型列表" style="margin-left:6px;padding:6px 8px;font-size:11px;white-space:nowrap;"><i data-lucide="download"></i></button>
         </div>
         <div id="cfg-emb-model-list" class="model-list-dropdown"></div>
         <div style="margin-top:10px;padding:10px 12px;border:1px dashed var(--border,#ddd);border-radius:6px;">
@@ -1847,8 +1847,8 @@
 
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
             <button type="button" class="btn-primary" onclick="oneClickLocal()" style="padding:7px 14px;display:inline-flex;align-items:center;gap:6px;"><svg class="icon" aria-hidden="true"><use href="#i-rocket"></use></svg> 一键搭建本地向量化（下载 + 切换）</button>
-            <button type="button" onclick="switchEmbedding('gemini')" style="padding:7px 12px;">切回云端</button>
-            <button type="button" onclick="loadLocalEmbStatus()" style="padding:7px 12px;">刷新状态</button>
+            <button type="button" onclick="switchEmbedding('gemini')" title="切回云端" style="padding:7px 10px;"><i data-lucide="cloud"></i></button>
+            <button type="button" onclick="loadLocalEmbStatus()" title="刷新状态" style="padding:7px 10px;"><i data-lucide="refresh-cw"></i></button>
           </div>
 
           <details style="margin-bottom:6px;">
@@ -1863,8 +1863,8 @@
                 <input type="text" id="local-emb-mirror-custom" placeholder="或自定义 registry 前缀，如 myhub.com/lib/" style="flex:1;margin-left:8px;" />
               </div>
               <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
-                <button type="button" onclick="pullLocalModel()" style="padding:6px 12px;">① 仅下载 bge-m3</button>
-                <button type="button" onclick="switchEmbedding('ollama')" style="padding:6px 12px;">② 仅切换到本地并重算 →</button>
+                <button type="button" onclick="pullLocalModel()" title="仅下载 bge-m3" style="padding:6px 10px;"><i data-lucide="download"></i> bge-m3</button>
+                <button type="button" onclick="switchEmbedding('ollama')" title="切换到本地并重算" style="padding:6px 10px;"><i data-lucide="cpu"></i> 切本地</button>
               </div>
             </div>
           </details>
@@ -1875,7 +1875,7 @@
       </div>
 
       <div style="display:flex;gap:12px;margin-top:14px;align-items:center;">
-        <button class="btn-primary" onclick="saveConfig(true)">保存</button>
+        <button class="btn-primary" onclick="saveConfig(true)" title="保存配置"><i data-lucide="check"></i></button>
         <span id="config-status" style="font-size:13px;"></span>
       </div>
       <div style="margin-top:6px;font-size:11px;color:var(--text-light);">注：本「保存」按钮同时提交「③ 引擎」与「④ 桶行为」中除采样外的所有字段（同一个 /api/config 接口），并立即写入 config.yaml。</div>
@@ -1899,8 +1899,8 @@
                  style="flex:1;" oninput="document.getElementById('sampling-temp-val').textContent=this.value;" />
         </div>
         <div style="display:flex;gap:8px;align-items:center;margin-top:6px;">
-          <button class="btn-primary" onclick="saveSamplingSettings()">保存</button>
-          <button onclick="testSamplingBreath()" style="font-size:12px;padding:4px 12px;">试一次 breath</button>
+          <button class="btn-primary" onclick="saveSamplingSettings()" title="保存"><i data-lucide="check"></i></button>
+          <button onclick="testSamplingBreath()" title="试一次 breath" style="font-size:12px;padding:4px 9px;"><i data-lucide="wind"></i></button>
           <span id="sampling-msg" style="font-size:12px;"></span>
         </div>
         <div id="sampling-test-result" style="margin-top:10px;font-size:12px;color:var(--text-dim);"></div>
@@ -1934,7 +1934,7 @@
         <div class="form-row" style="align-items:center;">
           <label>Model</label>
           <input type="text" id="env-compress-model" placeholder="例：deepseek-chat" style="font-family:monospace;flex:1;" />
-          <button type="button" onclick="fetchModels('env-compress')" style="margin-left:6px;padding:5px 9px;font-size:11px;white-space:nowrap;">获取模型 ↓</button>
+          <button type="button" onclick="fetchModels('env-compress')" title="获取模型列表" style="margin-left:6px;padding:5px 7px;font-size:11px;white-space:nowrap;"><i data-lucide="download"></i></button>
         </div>
         <div id="env-compress-model-list" class="model-list-dropdown" style="margin-left:122px;"></div>
         <div class="form-row">
@@ -1967,7 +1967,7 @@
       </div>
 
       <div style="display:flex;gap:12px;align-items:center;margin-bottom:20px;">
-        <button class="btn-primary" onclick="saveEnvConfig()">保存</button>
+        <button class="btn-primary" onclick="saveEnvConfig()" title="保存环境配置"><i data-lucide="check"></i></button>
         <span id="env-config-status" style="font-size:13px;"></span>
       </div>
 
@@ -1980,7 +1980,7 @@
           </div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
             <span id="env-vars-summary" style="font-size:12px;color:var(--text-dim);"></span>
-            <button onclick="loadEnvVars()" style="font-size:12px;padding:4px 12px;">刷新</button>
+            <button onclick="loadEnvVars()" title="刷新" style="font-size:12px;padding:4px 9px;"><i data-lucide="refresh-cw"></i></button>
           </div>
           <div id="env-vars-list" style="font-size:12px;"></div>
         </div>
@@ -2033,13 +2033,13 @@
           <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
             <span style="color:var(--text-dim);font-size:11px;min-width:60px;">主 /mcp</span>
             <span id="mcp-url-main" style="flex:1;color:var(--text);word-break:break-all;"></span>
-            <button onclick="copyMcpUrl('main')" style="padding:3px 10px;font-size:11px;white-space:nowrap;background:none;border:1px solid var(--border);border-radius:3px;cursor:pointer;color:var(--text-dim);">复制</button>
+            <button onclick="copyMcpUrl('main')" title="复制" style="padding:3px 8px;font-size:11px;white-space:nowrap;background:none;border:1px solid var(--border);border-radius:3px;cursor:pointer;color:var(--text-dim);"><i data-lucide="copy"></i></button>
           </div>
           <div style="border-top:1px solid rgba(150,138,116,0.12);margin:6px 0;"></div>
           <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
             <span style="color:var(--text-dim);font-size:11px;min-width:60px;">副 /mcp-extra</span>
             <span id="mcp-url-extra" style="flex:1;color:var(--text);word-break:break-all;"></span>
-            <button onclick="copyMcpUrl('extra')" style="padding:3px 10px;font-size:11px;white-space:nowrap;background:none;border:1px solid var(--border);border-radius:3px;cursor:pointer;color:var(--text-dim);">复制</button>
+            <button onclick="copyMcpUrl('extra')" title="复制" style="padding:3px 8px;font-size:11px;white-space:nowrap;background:none;border:1px solid var(--border);border-radius:3px;cursor:pointer;color:var(--text-dim);"><i data-lucide="copy"></i></button>
           </div>
         </div>
         <div id="mcp-copy-msg" style="margin-top:4px;font-size:11px;color:var(--positive);min-height:16px;"></div>
@@ -2047,8 +2047,8 @@
 
       <!-- 操作按钮 -->
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-        <button class="btn-primary" onclick="copyAllMcpUrls()">一键复制两条链接</button>
-        <button onclick="exportClaudeDesktopConfig()" style="padding:7px 14px;font-size:13px;border:1px solid var(--border);background:none;border-radius:2px;cursor:pointer;font-family:inherit;color:var(--text);">导出 claude_desktop_config.json</button>
+        <button class="btn-primary" onclick="copyAllMcpUrls()" title="一键复制两条链接"><i data-lucide="copy"></i> 复制全部</button>
+        <button onclick="exportClaudeDesktopConfig()" title="导出 claude_desktop_config.json" style="padding:7px 14px;font-size:13px;border:1px solid var(--border);background:none;border-radius:2px;cursor:pointer;font-family:inherit;color:var(--text);display:inline-flex;align-items:center;gap:6px;"><i data-lucide="download"></i> desktop config</button>
       </div>
 
       <details style="margin-top:16px;">
@@ -2098,9 +2098,9 @@
       </div>
 
       <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
-        <button type="button" onclick="saveGithubConfig()" style="padding:7px 18px;font-size:13px;">保存配置</button>
-        <button type="button" onclick="validateGithub()" style="padding:7px 18px;font-size:13px;background:var(--surface);border:1px solid var(--border);color:var(--text);">验证连接</button>
-        <button type="button" onclick="runGithubSync()" id="gh-sync-btn" style="padding:7px 18px;font-size:13px;background:#2d7d46;color:#fff;border:none;border-radius:6px;cursor:pointer;">立即同步 ↑</button>
+        <button type="button" onclick="saveGithubConfig()" title="保存配置" style="padding:7px 14px;font-size:13px;"><i data-lucide="check"></i></button>
+        <button type="button" onclick="validateGithub()" title="验证连接" style="padding:7px 14px;font-size:13px;background:var(--surface);border:1px solid var(--border);color:var(--text);"><i data-lucide="shield-check"></i></button>
+        <button type="button" onclick="runGithubSync()" id="gh-sync-btn" title="立即同步" style="padding:7px 14px;font-size:13px;background:#2d7d46;color:#fff;border:none;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;"><i data-lucide="upload-cloud"></i> 同步</button>
       </div>
 
       <div id="gh-msg" style="margin-top:12px;font-size:12px;min-height:18px;"></div>
@@ -3277,7 +3277,7 @@ function renderForgottenGroup(forgotten) {
       '<span class="name" onclick="showDetail(\'' + b.id + '\')" style="cursor:pointer;">' + esc(b.name) + '</span>' +
       '<span class="domain">' + (b.domain || []).join(', ') + '</span>' +
       '<span class="time">' + formatTimeAgo(b.last_active || b.created) + '</span>' +
-      '<button onclick="bucketAllowOne(\'' + b.id + '\')" style="font-size:11px;padding:2px 8px;margin-left:auto;">允许浮现</button>' +
+      '<button onclick="bucketAllowOne(\'' + b.id + '\')" title="允许浮现" style="font-size:11px;padding:2px 6px;margin-left:auto;display:inline-flex;align-items:center;"><i data-lucide="eye" style="width:12px;height:12px;"></i></button>' +
       '</div>';
   }).join('');
   if (window.lucide) lucide.createIcons();
@@ -5584,7 +5584,7 @@ function renderEditForm(bid, meta) {
         <textarea id="edit-content" placeholder="留空不改" style="min-height:120px;font-family:inherit;line-height:1.7;resize:vertical;">${curContent}</textarea>
       </div>
       <div style="margin-top:12px;display:flex;gap:10px;align-items:center;">
-        <button class="btn-primary" onclick="bucketSaveEdit('${bid}')">保存修改</button>
+        <button class="btn-primary" onclick="bucketSaveEdit('${bid}')" title="保存修改"><i data-lucide="check"></i></button>
         <span id="edit-msg" style="font-size:12px;"></span>
       </div>
     </details>`;
@@ -5699,7 +5699,7 @@ async function loadAnchorsView() {
           <div style="font-size:11px;color:var(--text-dim);margin-top:2px;line-height:1.5;">${_escapeAnchorHtml(a.preview || '')}</div>
           <div style="font-size:10px;color:var(--text-dim);margin-top:4px;">created: ${a.created || ''}</div>
         </div>
-        <button class="btn-secondary" style="font-size:11px;padding:4px 12px;" onclick="releaseAnchor('${a.id}')">release</button>
+        <button class="btn-secondary" title="release anchor" style="font-size:11px;padding:4px 9px;" onclick="releaseAnchor('${a.id}')"><i data-lucide="unlock" style="width:12px;height:12px;"></i></button>
       </div>
     `).join('');
     refreshAnchorCounter();
@@ -5768,8 +5768,8 @@ function _renderLetter(l) {
     ${l.title ? `<div style="font-family:'Cormorant Garamond', serif;font-size:17px;font-weight:600;margin-bottom:8px;color:var(--text);">${esc(l.title)}</div>` : ''}
     <div style="white-space:pre-wrap;font-size:14px;line-height:1.75;color:var(--text);">${esc(l.content || '')}</div>
     <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end;font-size:11px;">
-      <button onclick="editLetter('${l.id}')" style="padding:4px 12px;background:transparent;border:1px solid var(--border);color:var(--text-dim);border-radius:2px;cursor:pointer;">编辑</button>
-      <button onclick="deleteLetter('${l.id}')" style="padding:4px 12px;background:transparent;border:1px solid var(--border);color:var(--accent);border-radius:2px;cursor:pointer;">删除</button>
+      <button onclick="editLetter('${l.id}')" title="编辑" style="padding:4px 9px;background:transparent;border:1px solid var(--border);color:var(--text-dim);border-radius:2px;cursor:pointer;display:inline-flex;align-items:center;"><i data-lucide="pencil" style="width:13px;height:13px;"></i></button>
+      <button onclick="deleteLetter('${l.id}')" title="删除" style="padding:4px 9px;background:transparent;border:1px solid var(--border);color:var(--accent);border-radius:2px;cursor:pointer;display:inline-flex;align-items:center;"><i data-lucide="trash-2" style="width:13px;height:13px;"></i></button>
     </div>
   </article>`;
 }

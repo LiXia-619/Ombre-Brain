@@ -180,6 +180,8 @@ class MCPAuthMiddleware:
         auth_required: bool,
         token_validator: TokenValidator,
         static_token_validator: TokenValidator | None = None,
+        read_only_token_validator: TokenValidator | None = None,
+        read_only_tools: frozenset[str] = frozenset(),
         auth_mode: str = "oauth",
         path_matcher: Callable[[object], bool] = is_mcp_endpoint_path,
         resource_path: str = "/mcp",
@@ -189,6 +191,8 @@ class MCPAuthMiddleware:
         self.auth_required = bool(auth_required)
         self.token_validator = token_validator
         self.static_token_validator = static_token_validator
+        self.read_only_token_validator = read_only_token_validator
+        self.read_only_tools = frozenset(read_only_tools)
         self.auth_mode = (
             auth_mode if auth_mode in ("oauth", "token", "hybrid") else "oauth"
         )
@@ -211,6 +215,7 @@ class MCPAuthMiddleware:
             resource = f"{base}{self.resource_path}"
             bearer_token = _extract_bearer_token(auth)
             valid = False
+            read_only = False
             if bearer_token:
                 primary_valid = bool(
                     self.token_validator(bearer_token, resource=resource)
@@ -222,6 +227,11 @@ class MCPAuthMiddleware:
                         self.static_token_validator(bearer_token, resource=resource)
                     )
                 valid = primary_valid | static_valid
+                if self.read_only_token_validator:
+                    read_only = bool(
+                        self.read_only_token_validator(bearer_token, resource=resource)
+                    )
+                    valid = valid | read_only
             if not valid and self.auth_mode in ("token", "hybrid"):
                 # Fallback header for MCP clients that can't customize Authorization.
                 alt_token = headers.get(b"ombre-mcp-token", b"").decode(
@@ -275,7 +285,109 @@ class MCPAuthMiddleware:
                     }
                 )
                 return
+            if read_only:
+                await self._call_read_only(scope, receive, send)
+                return
         await self.app(scope, receive, send)
+
+    async def _call_read_only(self, scope: dict, receive: Any, send: Any) -> None:
+        chunks: list[bytes] = []
+        while True:
+            message = await receive()
+            chunks.append(message.get("body", b""))
+            if not message.get("more_body", False):
+                break
+        body = b"".join(chunks)
+        try:
+            request = json.loads(body)
+        except (TypeError, ValueError, UnicodeDecodeError):
+            await self._send_read_only_denial(send, None, "invalid JSON-RPC request")
+            return
+        method = request.get("method") if isinstance(request, dict) else None
+        allowed_methods = {"initialize", "notifications/initialized", "ping", "tools/list"}
+        if method == "tools/call":
+            params = request.get("params") if isinstance(request.get("params"), dict) else {}
+            if params.get("name") not in self.read_only_tools:
+                await self._send_read_only_denial(
+                    send, request.get("id"), "read-only credential cannot call this tool"
+                )
+                return
+        elif method not in allowed_methods:
+            await self._send_read_only_denial(
+                send, request.get("id") if isinstance(request, dict) else None,
+                "read-only credential cannot use this MCP method",
+            )
+            return
+
+        sent: list[dict] = []
+
+        async def capture(message: dict) -> None:
+            sent.append(message)
+
+        delivered = False
+
+        async def replay() -> dict:
+            nonlocal delivered
+            if delivered:
+                return {"type": "http.disconnect"}
+            delivered = True
+            return {"type": "http.request", "body": body, "more_body": False}
+
+        await self.app(scope, replay, capture)
+        if method == "tools/list":
+            response_body = b"".join(
+                message.get("body", b"")
+                for message in sent
+                if message.get("type") == "http.response.body"
+            )
+            try:
+                response = json.loads(response_body)
+                tools = response["result"]["tools"]
+                response["result"]["tools"] = [
+                    tool for tool in tools if tool.get("name") in self.read_only_tools
+                ]
+                filtered = json.dumps(response, ensure_ascii=False).encode("utf-8")
+            except (KeyError, TypeError, ValueError, UnicodeDecodeError):
+                await self._send_read_only_denial(send, request.get("id"), "invalid tools/list response")
+                return
+            for message in sent:
+                if message.get("type") == "http.response.start":
+                    headers = [
+                        header for header in message.get("headers", [])
+                        if header[0].lower() != b"content-length"
+                    ]
+                    headers.append((b"content-length", str(len(filtered)).encode()))
+                    await send({**message, "headers": headers})
+                elif message.get("type") == "http.response.body":
+                    if response_body:
+                        await send({"type": "http.response.body", "body": filtered, "more_body": False})
+                        response_body = b""
+                else:
+                    await send(message)
+            return
+        for message in sent:
+            await send(message)
+
+    @staticmethod
+    async def _send_read_only_denial(send: Any, request_id: Any, reason: str) -> None:
+        body = json.dumps(
+            {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "error": {"code": -32003, "message": reason},
+            }
+        ).encode()
+        await send(
+            {
+                "type": "http.response.start",
+                "status": 403,
+                "headers": [
+                    (b"content-type", b"application/json"),
+                    (b"content-length", str(len(body)).encode()),
+                ],
+            }
+        )
+        await send({"type": "http.response.body", "body": body, "more_body": False})
 
 
 class MCPJSONAcceptShim:
@@ -681,6 +793,8 @@ def build_http_app(
     token_validator: TokenValidator,
     lifecycle: RuntimeLifecycle,
     static_token_validator: TokenValidator | None = None,
+    read_only_token_validator: TokenValidator | None = None,
+    read_only_tools: frozenset[str] = frozenset(),
 ) -> Any:
     """Build the HTTP (streamable-http) ASGI app with one consistent middleware stack."""
 
@@ -717,6 +831,8 @@ def build_http_app(
         auth_required=settings.auth_required,
         token_validator=token_validator,
         static_token_validator=static_token_validator,
+        read_only_token_validator=read_only_token_validator,
+        read_only_tools=read_only_tools,
         auth_mode=settings.auth_mode,
         path_matcher=mcp_path_matcher,
         resource_path="/mcp",

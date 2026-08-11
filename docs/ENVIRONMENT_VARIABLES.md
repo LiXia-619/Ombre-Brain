@@ -38,6 +38,9 @@
 - `OMBRE_MCP_REQUIRE_AUTH`：是否要求 MCP 鉴权。
 - `OMBRE_MCP_AUTH_MODE`：`oauth`、`token` 或 `hybrid`。`hybrid` 保留 OAuth 动态注册，同时让 `Authorization: Bearer` 也接受预置静态 Token；关闭鉴权仍由 `OMBRE_MCP_REQUIRE_AUTH=false` 控制。
 - `OMBRE_MCP_TOKEN`：静态 Token / OAuth + 静态 Token 共存模式的预置密钥。
+- `OMBRE_MCP_READ_TOKEN`：O2-A 器官接驳专用只读密钥；只允许列出并调用
+  `recall_contract` 与 `recall_structured`，不能调用任何写工具。必须与
+  `OMBRE_MCP_TOKEN` 使用不同随机值，且仅在 `OMBRE_MCP_REQUIRE_AUTH=true` 时构成权限边界。
 - `OMBRE_ALLOW_INSECURE_MCP`：Dashboard / 部署向导保存非回环免鉴权组合、以及内置 Tunnel 免鉴权启动时的高风险确认。直接设置 `OMBRE_MCP_REQUIRE_AUTH=false` 会按明确配置生效；该变量不再是启动期暗中改写鉴权开关的条件。
 - `OMBRE_DASHBOARD_PASSWORD`：Dashboard 密码。部署到能被公网/远程访问的机器前建议直接设置此项——首次访问 Dashboard 时弹出的"设置密码"表单只信任本机回环连接（见 `OMBRE_SETUP_TOKEN`），提前设好这个变量能跳过那道限制，远程也能直接登录。
 - `OMBRE_SETUP_TOKEN`：首次设置密码的远程覆盖口令。默认只有从 `127.0.0.1`/`localhost` 直连（且没有反向代理转发头）的请求才能调用 `/auth/setup`；设置此变量后，远程请求带上请求头 `X-Ombre-Setup-Token: <此变量的值>` 也可以完成首次设置（Dashboard 网页本身不发这个头，需要手动 `curl` 调用一次）。适合"已经部署到云服务器、还没来得及先设 `OMBRE_DASHBOARD_PASSWORD`"这种场景的补救；密码设置成功后这个 token 就不再需要。

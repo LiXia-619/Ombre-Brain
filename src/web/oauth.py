@@ -789,6 +789,22 @@ def _is_valid_static_mcp_token(token: str, resource: str = "") -> bool:
     return _hmac.compare_digest(supplied_digest, configured_digest)
 
 
+def _is_valid_read_only_mcp_token(token: str, resource: str = "") -> bool:
+    """Validate the separate organ-read credential.
+
+    It is intentionally environment-only: the Dashboard must not silently
+    convert an ordinary full-access token into a house integration key.
+    """
+    if not token:
+        return False
+    configured = os.environ.get("OMBRE_MCP_READ_TOKEN", "").strip()
+    if not configured:
+        return False
+    supplied_digest = _hashlib_oauth.sha256(token.encode("utf-8")).digest()
+    configured_digest = _hashlib_oauth.sha256(configured.encode("utf-8")).digest()
+    return _hmac.compare_digest(supplied_digest, configured_digest)
+
+
 def _oauth_log_field(value: object, max_chars: int) -> str:
     """移除日志字段中的控制字符并限制长度。"""
     if max_chars <= 0:

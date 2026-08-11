@@ -26,6 +26,8 @@ from server_app import (
 
 
 EXPECTED_PUBLIC_MCP_TOOLS = (
+    "recall_contract",
+    "recall_structured",
     "breath",
     "breath_search",
     "breath_advanced",

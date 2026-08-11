@@ -68,6 +68,7 @@ from tools import anchor as _t_anchor
 from tools import plan as _t_plan
 from tools import dream as _t_dream
 from tools import i as _t_i
+from tools import recall_structured as _t_recall_structured
 
 # --- Load config & init logging / 加载配置 & 初始化日志 ---
 config = load_config()
@@ -315,7 +316,7 @@ _gh_auto_interval: int = int(_gh_cfg.get("auto_interval_minutes") or 0)
 # host="0.0.0.0" so Docker container's HTTP endpoint is externally reachable
 # stdio mode ignores host (no network)
 #
-# iter 2.2 后对外只有单连接器 /mcp。当前 16 个工具全部直接注册到
+# iter 2.2 后对外只有单连接器 /mcp。当前 18 个工具全部直接注册到
 # 这一实例，不再依赖 FastMCP 私有注册表的启动期合并，导入式 ASGI 启动也能
 # 稳定暴露完整工具清单。
 #
@@ -610,6 +611,7 @@ async def _with_notice(coro: Awaitable[str], op: str = "", args: dict | None = N
 # =============================================================
 _tools_runtime.init(
     config=config,
+    version=__version__,
     bucket_mgr=bucket_mgr,
     dehydrator=dehydrator,
     decay_engine=decay_engine,
@@ -628,6 +630,34 @@ _tools_runtime.init(
 # MCP 工具 —— 仅注册，实现见 tools/<tool>/
 # 每个入口都不超过 10 行，便于一眼看清参数与归属
 # =============================================================
+@mcp.tool()
+async def recall_contract() -> dict:
+    """返回 O2-A 只读器官协议、版本、vault 绑定、工具白名单与硬预算。此工具不读记忆正文、不写 vault。"""
+    return _t_recall_structured.contract()
+
+
+@mcp.tool()
+async def recall_structured(
+    query: str,
+    domain: Optional[str] = "",
+    tags: Optional[str] = "",
+    max_results: Optional[int] = 5,
+    max_tokens: Optional[int] = 3500,
+    date_from: Optional[str] = "",
+    date_to: Optional[str] = "",
+) -> dict:
+    """O2-A 结构化只读召回。返回稳定 bucket 来源、相关度、情感坐标、未解决状态与摘要；不 touch、不 dream、不写 vault。"""
+    return await _t_recall_structured.dispatch(
+        query=query,
+        domain=domain,
+        tags=tags,
+        max_results=max_results,
+        max_tokens=max_tokens,
+        date_from=date_from,
+        date_to=date_to,
+    )
+
+
 @mcp.tool()
 async def breath(
     query: Optional[str] = "",
@@ -1162,7 +1192,11 @@ for _strict_tool_name in (
 # OAuth 2.0 — MCP Remote Auth —— 已拆分到 web/oauth.py（路由在其 register 内注册）。
 # 这里把启动期 MCP 鉴权中间件要用的两个校验函数 import 回来；hybrid 会同时注入。
 # ============================================================
-from web.oauth import _is_valid_mcp_token, _is_valid_static_mcp_token  # noqa: F401
+from web.oauth import (  # noqa: F401
+    _is_valid_mcp_token,
+    _is_valid_read_only_mcp_token,
+    _is_valid_static_mcp_token,
+)
 
 
 # ============================================================
@@ -1223,9 +1257,11 @@ if __name__ == "__main__":
             token_validator=_mcp_token_validator,
             lifecycle=_runtime_lifecycle,
             static_token_validator=_mcp_static_token_validator,
+            read_only_token_validator=_is_valid_read_only_mcp_token,
+            read_only_tools=_t_recall_structured.READ_ONLY_TOOL_NAMES,
         )
         if transport == "streamable-http":
-            logger.info("MCP 单连接器 /mcp：16 个工具统一对外暴露")
+            logger.info("MCP 单连接器 /mcp：完整凭据 18 个工具，只读器官凭据 2 个工具")
         logger.info("CORS middleware enabled for remote transport / 已启用 CORS 中间件")
         logger.info(
             "MCP request body limit: %s",
@@ -1311,7 +1347,7 @@ if __name__ == "__main__":
             proxy_headers=False,
         )
     elif transport == "stdio":
-        # stdio：16 个工具已直接注册在唯一 mcp 实例上；启动成功边界由
+        # stdio：18 个工具已直接注册在唯一 mcp 实例上；启动成功边界由
         # FastMCP public lifespan 触发。向量队列必须与 HTTP 一样纳入生命周期，
         # 否则正文落盘后会退回同步索引，让慢 provider 拖住工具回包。
         _stdio_runtime_lifecycle = RuntimeLifecycle(

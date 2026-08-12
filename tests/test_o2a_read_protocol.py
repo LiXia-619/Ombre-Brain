@@ -34,8 +34,8 @@ class FakeBucketManager:
                     "domain": ["life"],
                     "tags": ["home"],
                     "importance": 8,
-                    "valence": 0.7,
-                    "arousal": 0.4,
+                    "valence": 0.0,
+                    "arousal": 1.0,
                     "resolved": False,
                 },
             }
@@ -64,15 +64,28 @@ async def test_structured_recall_returns_bounded_provenance_without_touch(monkey
         date_to="2026-08-01",
     )
 
-    assert result["schema"] == "ombre-structured-recall-v1"
+    assert result["schema"] == "ombre-structured-recall-v2"
+    assert result["protocol_version"] == 2
+    assert result["digest_profile"] == "ombre-fixed6-numeric-v1"
     assert result["semantic_mutation_permitted"] is False
     assert result["count"] == 1
     assert result["items"][0]["bucket_id"] == "bucket-1"
     assert result["items"][0]["source"]["vault_binding"] == result["vault_binding"]
     assert result["items"][0]["unresolved"] is True
+    assert result["items"][0]["affect"] == {"valence": 0.0, "arousal": 1.0}
     assert len(result["items"][0]["digest"]) == 64
     assert len(result["result_digest"]) == 64
     assert manager.touch_calls == []
+
+
+def test_read_contract_requires_the_v2_numeric_digest_profile(monkeypatch):
+    monkeypatch.setattr(rt, "config", {"vault_id": "o2h-contract-vault"})
+    monkeypatch.setattr(rt, "version", "2.test")
+    value = recall_structured.contract()
+    assert value["schema"] == "ombre-read-protocol-v2"
+    assert value["protocol_version"] == 2
+    assert value["result_schema"] == "ombre-structured-recall-v2"
+    assert value["digest_profile"] == "ombre-fixed6-numeric-v1"
 
 
 class JSONRPCApp:

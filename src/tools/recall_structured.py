@@ -14,6 +14,12 @@ from typing import Any, Mapping, Optional
 
 from ombrebrain.policy.surfacing import SurfacePolicyVM
 from tools import _runtime as rt
+from tools.recall_digest import (
+    DIGEST_PROFILE,
+    normalize_nullable_affect,
+    normalize_unit_float,
+    sha256 as protocol_sha256,
+)
 from tools.breath.search import (
     _bucket_has_tags,
     _bucket_in_created_range,
@@ -25,8 +31,8 @@ from tools.plan.core import is_letter_bucket
 from utils import count_tokens_approx, parse_bool
 
 
-READ_PROTOCOL_SCHEMA = "ombre-read-protocol-v1"
-STRUCTURED_RECALL_SCHEMA = "ombre-structured-recall-v1"
+READ_PROTOCOL_SCHEMA = "ombre-read-protocol-v2"
+STRUCTURED_RECALL_SCHEMA = "ombre-structured-recall-v2"
 READ_ONLY_TOOL_NAMES = frozenset({"recall_contract", "recall_structured"})
 MAX_STRUCTURED_RESULTS = 20
 MAX_STRUCTURED_TOKENS = 6000
@@ -44,13 +50,14 @@ def _vault_binding() -> str:
 def contract() -> dict[str, Any]:
     return {
         "schema": READ_PROTOCOL_SCHEMA,
-        "protocol_version": 1,
+        "protocol_version": 2,
         "organ": "ombre-brain",
         "organ_version": str(rt.version or "unknown"),
         "vault_binding": _vault_binding(),
         "capability": "memory-recall:read",
         "tools": sorted(READ_ONLY_TOOL_NAMES),
         "result_schema": STRUCTURED_RECALL_SCHEMA,
+        "digest_profile": DIGEST_PROFILE,
         "limits": {
             "max_results": MAX_STRUCTURED_RESULTS,
             "max_tokens": MAX_STRUCTURED_TOKENS,
@@ -85,7 +92,12 @@ def _item(bucket: Mapping[str, Any]) -> dict[str, Any]:
         content = ""
     score = bucket.get("score", bucket.get("weight", 0.0))
     try:
-        relevance = max(0.0, min(1.0, float(score)))
+        relevance = normalize_unit_float(
+            max(0.0, min(1.0, float(score))),
+            field="relevance",
+            minimum=0.0,
+            maximum=1.0,
+        )
     except (TypeError, ValueError, OverflowError):
         relevance = 0.0
     item = {
@@ -96,23 +108,19 @@ def _item(bucket: Mapping[str, Any]) -> dict[str, Any]:
             "kind": "ombre-bucket",
             "vault_binding": _vault_binding(),
         },
-        "relevance": round(relevance, 6),
+        "relevance": relevance,
         "created": str(meta.get("created") or ""),
         "domains": [str(value) for value in (meta.get("domain") or [])],
         "tags": [str(value) for value in (meta.get("tags") or [])],
         "importance": int(meta.get("importance") or 0),
         "affect": {
-            "valence": meta.get("valence"),
-            "arousal": meta.get("arousal"),
+            "valence": normalize_nullable_affect(meta.get("valence"), field="valence"),
+            "arousal": normalize_nullable_affect(meta.get("arousal"), field="arousal"),
         },
         "unresolved": not parse_bool(meta.get("resolved"), default=False),
         "protected": parse_bool(meta.get("protected"), default=False),
     }
-    item["digest"] = hashlib.sha256(
-        json.dumps(item, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode(
-            "utf-8"
-        )
-    ).hexdigest()
+    item["digest"] = protocol_sha256(item)
     return item
 
 
@@ -170,10 +178,11 @@ async def dispatch(
 
     payload: dict[str, Any] = {
         "schema": STRUCTURED_RECALL_SCHEMA,
-        "protocol_version": 1,
+        "protocol_version": 2,
         "organ_version": str(rt.version or "unknown"),
         "vault_binding": _vault_binding(),
         "query_digest": hashlib.sha256(query.encode("utf-8")).hexdigest(),
+        "digest_profile": DIGEST_PROFILE,
         "semantic_status": "degraded" if semantic_notice else "available",
         "items": selected,
         "count": len(selected),
@@ -181,9 +190,5 @@ async def dispatch(
         "truncated": len(selected) >= result_limit or used_tokens >= token_limit,
         "semantic_mutation_permitted": False,
     }
-    payload["result_digest"] = hashlib.sha256(
-        json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode(
-            "utf-8"
-        )
-    ).hexdigest()
+    payload["result_digest"] = protocol_sha256(payload)
     return payload

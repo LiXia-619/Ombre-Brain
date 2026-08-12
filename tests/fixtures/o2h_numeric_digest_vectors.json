@@ -1,0 +1,70 @@
+[
+  {
+    "id": "integral-zero-item",
+    "value": {
+      "bucket_id": "o2h-integral",
+      "title": "Integral coordinates",
+      "content": "Synthetic protocol vector.",
+      "source": {
+        "kind": "ombre-bucket",
+        "vault_binding": "o2h-vault"
+      },
+      "relevance": 1,
+      "created": "2026-08-12T00:00:00+00:00",
+      "domains": ["test"],
+      "tags": ["o2h"],
+      "importance": 1,
+      "affect": {
+        "valence": 0,
+        "arousal": 1
+      },
+      "unresolved": false,
+      "protected": false
+    },
+    "canonical": "{\"affect\":{\"arousal\":1.000000,\"valence\":0.000000},\"bucket_id\":\"o2h-integral\",\"content\":\"Synthetic protocol vector.\",\"created\":\"2026-08-12T00:00:00+00:00\",\"domains\":[\"test\"],\"importance\":1,\"protected\":false,\"relevance\":1.000000,\"source\":{\"kind\":\"ombre-bucket\",\"vault_binding\":\"o2h-vault\"},\"tags\":[\"o2h\"],\"title\":\"Integral coordinates\",\"unresolved\":false}",
+    "sha256": "245cc1d5fe0a32f3fd57bd6c5530cf25a92400899aa685145e512ca6a25d6908"
+  },
+  {
+    "id": "negative-zero-profile",
+    "value": {
+      "affect": {
+        "arousal": -0.0,
+        "valence": 0.0
+      },
+      "relevance": 0.0
+    },
+    "canonical": "{\"affect\":{\"arousal\":0.000000,\"valence\":0.000000},\"relevance\":0.000000}",
+    "sha256": "1cb675e335b3bad7980554d3bd1bb612bc5bdd88e8583fb7ba0ee5374bb13c16"
+  },
+  {
+    "id": "fractional-profile",
+    "value": {
+      "affect": {
+        "arousal": 0.123457,
+        "valence": -0.333333
+      },
+      "relevance": 0.875432
+    },
+    "canonical": "{\"affect\":{\"arousal\":0.123457,\"valence\":-0.333333},\"relevance\":0.875432}",
+    "sha256": "f430c545f2cdfaadc1d6816722ebedb75fa56b5add18876a5f0c0ce875395e32"
+  },
+  {
+    "id": "result-envelope",
+    "value": {
+      "schema": "ombre-structured-recall-v2",
+      "protocol_version": 2,
+      "organ_version": "2.test",
+      "vault_binding": "o2h-vault",
+      "query_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+      "digest_profile": "ombre-fixed6-numeric-v1",
+      "semantic_status": "available",
+      "items": [],
+      "count": 0,
+      "estimated_tokens": 0,
+      "truncated": false,
+      "semantic_mutation_permitted": false
+    },
+    "canonical": "{\"count\":0,\"digest_profile\":\"ombre-fixed6-numeric-v1\",\"estimated_tokens\":0,\"items\":[],\"organ_version\":\"2.test\",\"protocol_version\":2,\"query_digest\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"schema\":\"ombre-structured-recall-v2\",\"semantic_mutation_permitted\":false,\"semantic_status\":\"available\",\"truncated\":false,\"vault_binding\":\"o2h-vault\"}",
+    "sha256": "32c8d56f670a9c3a2b48bfbf74acc3f845963f0e7b38f50cbee3d3a752a17359"
+  }
+]

@@ -795,7 +795,12 @@ def _is_valid_read_only_mcp_token(token: str, resource: str = "") -> bool:
     It is intentionally environment-only: the Dashboard must not silently
     convert an ordinary full-access token into a house integration key.
     """
-    if not token:
+    enabled_value = os.environ.get("OMBRE_MCP_READ_ENABLED", "").strip()
+    enabled = parse_bool(
+        enabled_value if enabled_value else sh.config.get("mcp_read_enabled", False),
+        default=False,
+    )
+    if not enabled or not token:
         return False
     configured = os.environ.get("OMBRE_MCP_READ_TOKEN", "").strip()
     if not configured:

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import hashlib
 import json
 import os
 from contextlib import asynccontextmanager
@@ -53,6 +54,9 @@ class HTTPRuntimeSettings:
     # used by OAuth route registration.  An empty value means request-derived
     # trusted-proxy/Host fallback.
     public_origin: str = ""
+    # O2-I defaults the separate organ-read surface closed even when a token
+    # happens to exist in the process environment.
+    read_only_enabled: bool = False
 
     @classmethod
     def from_config(
@@ -89,7 +93,88 @@ class HTTPRuntimeSettings:
             max_management_request_bytes=max_management_request_bytes,
             auth_mode=auth_mode,
             public_origin=configured_public_origin(config),
+            read_only_enabled=parse_bool(
+                config.get("mcp_read_enabled", False), default=False
+            ),
         )
+
+
+@dataclass(frozen=True)
+class MCPReadExposurePreflight:
+    """Sanitized O2-I startup verdict; contains no token, path, or memory text."""
+
+    decision: str
+    reason_codes: tuple[str, ...]
+    binding_digest: str | None
+    exact_tools: tuple[str, ...]
+    zero_side_effects: bool
+    rollback_ready: bool
+
+    @property
+    def go(self) -> bool:
+        return self.decision == "GO"
+
+
+def assess_mcp_read_exposure(
+    settings: HTTPRuntimeSettings,
+    config: Mapping[str, Any],
+    *,
+    environment: Mapping[str, str] | None = None,
+    read_only_tools: frozenset[str] = frozenset(),
+) -> MCPReadExposurePreflight:
+    """Fail closed before mounting the O2-A read credential surface."""
+
+    env = os.environ if environment is None else environment
+    reasons: set[str] = set()
+    expected_tools = frozenset({"recall_contract", "recall_structured"})
+    read_token = str(env.get("OMBRE_MCP_READ_TOKEN", "") or "").strip()
+    full_tokens = {
+        token
+        for token in (
+            str(env.get("OMBRE_MCP_TOKEN", "") or "").strip(),
+            str(config.get("mcp_token", "") or "").strip(),
+        )
+        if token
+    }
+    vault_id = str(config.get("vault_id", "") or "").strip()
+    vault_id_is_opaque = (
+        bool(vault_id)
+        and vault_id not in {".", ".."}
+        and not vault_id.startswith("~")
+        and "/" not in vault_id
+        and "\\" not in vault_id
+        and not (len(vault_id) >= 2 and vault_id[0].isalpha() and vault_id[1] == ":")
+    )
+
+    if not settings.read_only_enabled:
+        reasons.add("master-switch-disabled")
+    if not settings.auth_required:
+        reasons.add("mcp-auth-required")
+    if str(config.get("transport", "")).strip() != "streamable-http":
+        reasons.add("streamable-http-required")
+    if not vault_id_is_opaque:
+        reasons.add("opaque-vault-binding-required")
+    if len(read_token) < 32:
+        reasons.add("read-credential-missing-or-short")
+    if read_token and read_token in full_tokens:
+        reasons.add("read-credential-reuses-full-token")
+    if read_only_tools != expected_tools:
+        reasons.add("read-tool-surface-mismatch")
+
+    binding_digest = (
+        hashlib.sha256(vault_id.encode("utf-8")).hexdigest()
+        if vault_id_is_opaque
+        else None
+    )
+    ordered_reasons = tuple(sorted(reasons))
+    return MCPReadExposurePreflight(
+        decision="GO" if not ordered_reasons else "NO-GO",
+        reason_codes=ordered_reasons,
+        binding_digest=binding_digest,
+        exact_tools=("recall_contract", "recall_structured"),
+        zero_side_effects=True,
+        rollback_ready=True,
+    )
 
 
 def _first_forwarded_value(value: str) -> str:

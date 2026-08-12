@@ -41,6 +41,10 @@
 - `OMBRE_MCP_READ_TOKEN`：O2-A 器官接驳专用只读密钥；只允许列出并调用
   `recall_contract` 与 `recall_structured`，不能调用任何写工具。必须与
   `OMBRE_MCP_TOKEN` 使用不同随机值，且仅在 `OMBRE_MCP_REQUIRE_AUTH=true` 时构成权限边界。
+- `OMBRE_MCP_READ_ENABLED`：O2-I 独立总开关，默认 `false`。只有显式设为 `true`、鉴权开启、
+  只读密钥足够长且不复用完整密钥、并存在稳定 `OMBRE_VAULT_ID` 时，进程才装配只读器官凭据面；
+  运行中改回 `false` 会让只读 validator 立即拒绝后续请求，重启后不再装配该表面。
+- `OMBRE_VAULT_ID`：外部只读协议使用的稳定 opaque vault binding；不得填写真实文件系统路径。
 - `OMBRE_ALLOW_INSECURE_MCP`：Dashboard / 部署向导保存非回环免鉴权组合、以及内置 Tunnel 免鉴权启动时的高风险确认。直接设置 `OMBRE_MCP_REQUIRE_AUTH=false` 会按明确配置生效；该变量不再是启动期暗中改写鉴权开关的条件。
 - `OMBRE_DASHBOARD_PASSWORD`：Dashboard 密码。部署到能被公网/远程访问的机器前建议直接设置此项——首次访问 Dashboard 时弹出的"设置密码"表单只信任本机回环连接（见 `OMBRE_SETUP_TOKEN`），提前设好这个变量能跳过那道限制，远程也能直接登录。
 - `OMBRE_SETUP_TOKEN`：首次设置密码的远程覆盖口令。默认只有从 `127.0.0.1`/`localhost` 直连（且没有反向代理转发头）的请求才能调用 `/auth/setup`；设置此变量后，远程请求带上请求头 `X-Ombre-Setup-Token: <此变量的值>` 也可以完成首次设置（Dashboard 网页本身不发这个头，需要手动 `curl` 调用一次）。适合"已经部署到云服务器、还没来得及先设 `OMBRE_DASHBOARD_PASSWORD`"这种场景的补救；密码设置成功后这个 token 就不再需要。

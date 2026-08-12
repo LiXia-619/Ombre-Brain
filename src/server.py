@@ -1214,6 +1214,7 @@ if __name__ == "__main__":
     from server_app import (
         HTTPRuntimeSettings,
         RuntimeLifecycle,
+        assess_mcp_read_exposure,
         build_http_app,
     )
 
@@ -1250,6 +1251,17 @@ if __name__ == "__main__":
             if _http_settings.auth_mode == "hybrid"
             else None
         )
+        _read_exposure = assess_mcp_read_exposure(
+            _http_settings,
+            config,
+            read_only_tools=_t_recall_structured.READ_ONLY_TOOL_NAMES,
+        )
+        logger.info(
+            "O2-I organ-read exposure decision=%s reasons=%s rollback_ready=%s",
+            _read_exposure.decision,
+            ",".join(_read_exposure.reason_codes) or "none",
+            _read_exposure.rollback_ready,
+        )
         _app = build_http_app(
             mcp,
             transport,
@@ -1257,8 +1269,14 @@ if __name__ == "__main__":
             token_validator=_mcp_token_validator,
             lifecycle=_runtime_lifecycle,
             static_token_validator=_mcp_static_token_validator,
-            read_only_token_validator=_is_valid_read_only_mcp_token,
-            read_only_tools=_t_recall_structured.READ_ONLY_TOOL_NAMES,
+            read_only_token_validator=(
+                _is_valid_read_only_mcp_token if _read_exposure.go else None
+            ),
+            read_only_tools=(
+                _t_recall_structured.READ_ONLY_TOOL_NAMES
+                if _read_exposure.go
+                else frozenset()
+            ),
         )
         if transport == "streamable-http":
             logger.info("MCP 单连接器 /mcp：完整凭据 18 个工具，只读器官凭据 2 个工具")

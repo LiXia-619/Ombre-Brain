@@ -56,6 +56,11 @@ mcp_require_auth: true
 mcp_auth_mode: "oauth"
 mcp_token: ""
 
+# --- O2-I organ read exposure (default closed) ---
+# This does not authorize a real resident connection. The token remains env-only.
+mcp_read_enabled: false
+vault_id: ""  # stable opaque binding; never a real filesystem path
+
 # --- HTTP hooks auth / HTTP 钩子鉴权 ---
 # /breath-hook and /dream-hook are protected by default.
 # They accept the Dashboard login cookie, or this token via the

@@ -59,7 +59,9 @@ Ombre Brain 的使用者是**模型自己**，不是它背后的人。所以这�
 ## 它的 18 个工具 / The 18 Tools
 
 18 个工具全部在**一个 MCP 连接器 `/mcp`** 上。普通 OAuth 或完整静态密钥可见全部能力；
-`OMBRE_MCP_READ_TOKEN` 只会看见 O2-A 的两个只读器官工具。
+O2-I 默认关闭独立器官面。只有显式设置 `OMBRE_MCP_READ_ENABLED=true`、稳定 opaque
+`OMBRE_VAULT_ID`，并通过鉴权与凭据隔离预检后，`OMBRE_MCP_READ_TOKEN` 才只会看见 O2-A
+的两个只读器官工具；仅存在 token 不会自动暴露它们。
 
 ### O2-A 只读器官工具
 

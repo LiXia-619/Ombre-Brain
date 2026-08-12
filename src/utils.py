@@ -418,6 +418,8 @@ def load_config(config_path: Optional[str] = None) -> dict:
         # 只有 mcp_require_auth=true 时才生效：OAuth、静态 Token 或两者共存。
         "mcp_auth_mode": "oauth",
         "mcp_token": "",
+        "mcp_read_enabled": False,
+        "vault_id": "",
         "buckets_dir": os.path.join(project_root, "buckets"),
         "merge_threshold": 75,
         "dehydration": {
@@ -591,6 +593,23 @@ def load_config(config_path: Optional[str] = None) -> dict:
         config["mcp_auth_mode"] = _env_mcp_auth_mode
 
     _apply_env_override(config, "OMBRE_MCP_TOKEN", "mcp_token")
+
+    # O2-I real-organ read exposure is independently and explicitly enabled.
+    # A stray OMBRE_MCP_READ_TOKEN alone must never mount the read surface.
+    _env_mcp_read_enabled = os.environ.get(
+        "OMBRE_MCP_READ_ENABLED", ""
+    ).strip()
+    if _env_mcp_read_enabled:
+        config["mcp_read_enabled"] = parse_bool(
+            _env_mcp_read_enabled,
+            default=False,
+        )
+    else:
+        config["mcp_read_enabled"] = parse_bool(
+            config.get("mcp_read_enabled", False),
+            default=False,
+        )
+    _apply_env_override(config, "OMBRE_VAULT_ID", "vault_id")
 
     # 安全兜底：选了 token 模式却没配密钥——宁可继续用更强的 OAuth 兜底，也不要让用户
     # 误以为已经开了保护、实际上 /mcp 会因校验函数拿不到密钥而被意外锁死或裸奔。

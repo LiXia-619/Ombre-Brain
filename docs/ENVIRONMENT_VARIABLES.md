@@ -45,6 +45,18 @@
   只读密钥足够长且不复用完整密钥、并存在稳定 `OMBRE_VAULT_ID` 时，进程才装配只读器官凭据面；
   运行中改回 `false` 会让只读 validator 立即拒绝后续请求，重启后不再装配该表面。
 - `OMBRE_VAULT_ID`：外部只读协议使用的稳定 opaque vault binding；不得填写真实文件系统路径。
+- `OMBRE_MCP_READ_DRILL_ENABLED`：O2-J 单次真实只读演练开关，默认 `false`。开启后，O2-I
+  只读面还必须同时通过下列三项授权约束，否则整个只读面保持关闭。
+- `OMBRE_MCP_READ_DRILL_AUTHORIZATION_DIGEST`：外部生成的 64 位小写 SHA-256；绑定两份独立
+  批准证据、一个 owner / organ / vault、一个查询摘要与本次资源上限。不得填批准原文或身份信息。
+- `OMBRE_MCP_READ_DRILL_EXPIRES_AT`：UTC 到期时间；启动时必须仍有效且不超过未来 15 分钟。
+- `OMBRE_MCP_READ_DRILL_MAX_RECALLS`：必须为 `1`。唯一一次 `recall_structured` 在进入记忆处理器
+  前原子消费；失败、过期或第二次调用都不能自动重试。
+
+开启 `OMBRE_MCP_READ_DRILL_ENABLED` 会把整个进程切换为 O2-J 专用只读生命周期：
+`embeddings.db` 必须预先建好且模型/维度一致，SQLite 以 immutable/query-only 打开；衰减、
+embedding outbox、隧道、GitHub 自动同步和本地模型子进程均不启动，完整权限凭据也不能穿过
+MCP 中间件。演练结束后应销毁该短生命周期进程，不要把它当作普通服务持续运行。
 - `OMBRE_ALLOW_INSECURE_MCP`：Dashboard / 部署向导保存非回环免鉴权组合、以及内置 Tunnel 免鉴权启动时的高风险确认。直接设置 `OMBRE_MCP_REQUIRE_AUTH=false` 会按明确配置生效；该变量不再是启动期暗中改写鉴权开关的条件。
 - `OMBRE_DASHBOARD_PASSWORD`：Dashboard 密码。部署到能被公网/远程访问的机器前建议直接设置此项——首次访问 Dashboard 时弹出的"设置密码"表单只信任本机回环连接（见 `OMBRE_SETUP_TOKEN`），提前设好这个变量能跳过那道限制，远程也能直接登录。
 - `OMBRE_SETUP_TOKEN`：首次设置密码的远程覆盖口令。默认只有从 `127.0.0.1`/`localhost` 直连（且没有反向代理转发头）的请求才能调用 `/auth/setup`；设置此变量后，远程请求带上请求头 `X-Ombre-Setup-Token: <此变量的值>` 也可以完成首次设置（Dashboard 网页本身不发这个头，需要手动 `curl` 调用一次）。适合"已经部署到云服务器、还没来得及先设 `OMBRE_DASHBOARD_PASSWORD`"这种场景的补救；密码设置成功后这个 token 就不再需要。

@@ -52,7 +52,7 @@ from ombrebrain.storage.source_store import SourceStore
 from ombrebrain.security.deployment_profile import enforce_mcp_network_guard
 from import_memory import ImportEngine
 from migrate_engine import MigrateEngine
-from utils import get_version, load_config, setup_logging
+from utils import get_version, load_config, parse_bool, setup_logging
 
 # --- iter 2.1：MCP 工具实现已按代码路径拆分到 tools/ 子包 ---
 # 本文件只保留 MCP 注册 + 路由（HTTP custom_route）+ 共享辅助。
@@ -1213,7 +1213,9 @@ if __name__ == "__main__":
 
     from server_app import (
         HTTPRuntimeSettings,
+        MCPReadDrillGuard,
         RuntimeLifecycle,
+        assess_mcp_read_drill,
         assess_mcp_read_exposure,
         build_http_app,
     )
@@ -1225,6 +1227,9 @@ if __name__ == "__main__":
         _http_settings = HTTPRuntimeSettings.from_config(config)
         _runtime_lifecycle = RuntimeLifecycle(
             logger=logger,
+            read_only_drill=parse_bool(
+                config.get("mcp_read_drill_enabled", False), default=False
+            ),
             decay_engine=decay_engine,
             embedding_outbox=embedding_outbox,
             ensure_ollama_child=_ollama_local.ensure_child_on_boot,
@@ -1256,11 +1261,28 @@ if __name__ == "__main__":
             config,
             read_only_tools=_t_recall_structured.READ_ONLY_TOOL_NAMES,
         )
+        _read_drill_requested = parse_bool(
+            config.get("mcp_read_drill_enabled", False), default=False
+        )
+        _read_drill_exposure = assess_mcp_read_drill(_read_exposure, config)
+        _read_surface_go = _read_exposure.go and (
+            not _read_drill_requested or _read_drill_exposure.go
+        )
+        _read_drill_guard = (
+            MCPReadDrillGuard(_read_drill_exposure)
+            if _read_drill_exposure.go
+            else None
+        )
         logger.info(
             "O2-I organ-read exposure decision=%s reasons=%s rollback_ready=%s",
             _read_exposure.decision,
             ",".join(_read_exposure.reason_codes) or "none",
             _read_exposure.rollback_ready,
+        )
+        logger.info(
+            "O2-J one-shot drill decision=%s reasons=%s",
+            _read_drill_exposure.decision,
+            ",".join(_read_drill_exposure.reason_codes) or "none",
         )
         _app = build_http_app(
             mcp,
@@ -1270,13 +1292,14 @@ if __name__ == "__main__":
             lifecycle=_runtime_lifecycle,
             static_token_validator=_mcp_static_token_validator,
             read_only_token_validator=(
-                _is_valid_read_only_mcp_token if _read_exposure.go else None
+                _is_valid_read_only_mcp_token if _read_surface_go else None
             ),
             read_only_tools=(
                 _t_recall_structured.READ_ONLY_TOOL_NAMES
-                if _read_exposure.go
+                if _read_surface_go
                 else frozenset()
             ),
+            read_only_drill_guard=_read_drill_guard,
         )
         if transport == "streamable-http":
             logger.info("MCP 单连接器 /mcp：完整凭据 18 个工具，只读器官凭据 2 个工具")

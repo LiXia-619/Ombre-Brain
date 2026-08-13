@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from typing import Any, Mapping, Optional
 
 from ombrebrain.policy.surfacing import SurfacePolicyVM
@@ -48,7 +49,7 @@ def _vault_binding() -> str:
 
 
 def contract() -> dict[str, Any]:
-    return {
+    value: dict[str, Any] = {
         "schema": READ_PROTOCOL_SCHEMA,
         "protocol_version": 2,
         "organ": "ombre-brain",
@@ -68,6 +69,36 @@ def contract() -> dict[str, Any]:
             "dream": False,
             "reflect": False,
         },
+    }
+    drill = _drill_attestation()
+    if drill is not None:
+        value["drill"] = drill
+    return value
+
+
+def _drill_attestation() -> dict[str, Any] | None:
+    config = rt.config if isinstance(rt.config, Mapping) else {}
+    if not parse_bool(config.get("mcp_read_drill_enabled", False), default=False):
+        return None
+    authorization_digest = str(
+        config.get("mcp_read_drill_authorization_digest", "") or ""
+    ).strip()
+    expires_at = str(config.get("mcp_read_drill_expires_at", "") or "").strip()
+    try:
+        max_recalls = int(config.get("mcp_read_drill_max_recalls", 1))
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if (
+        not re.fullmatch(r"[a-f0-9]{64}", authorization_digest)
+        or not expires_at
+        or max_recalls != 1
+    ):
+        return None
+    return {
+        "schema": "ombre-read-drill-attestation-v1",
+        "authorization_digest": authorization_digest,
+        "max_structured_recalls": 1,
+        "expires_at": expires_at,
     }
 
 

@@ -60,6 +60,10 @@ mcp_token: ""
 # This does not authorize a real resident connection. The token remains env-only.
 mcp_read_enabled: false
 vault_id: ""  # stable opaque binding; never a real filesystem path
+mcp_read_drill_enabled: false
+mcp_read_drill_authorization_digest: ""  # O2-J external authorization digest only
+mcp_read_drill_expires_at: ""  # UTC instant, no more than 15 minutes ahead
+mcp_read_drill_max_recalls: 1  # O2-J accepts exactly one
 
 # --- HTTP hooks auth / HTTP 钩子鉴权 ---
 # /breath-hook and /dream-hook are protected by default.

@@ -18,3 +18,11 @@ reject immediately; restart then removes the surface from assembly.
 This preflight does not deploy O2-A and does not authorize connection to a real
 vault, credential, memory set, resident, room checkpoint, or any write, touch,
 dream, or reflect path.
+
+O2-J adds an optional stricter process mode on top of this gate. When
+`OMBRE_MCP_READ_DRILL_ENABLED=true`, the read surface remains closed unless a
+64-hex external authorization digest, an expiry no more than 15 minutes away,
+and `OMBRE_MCP_READ_DRILL_MAX_RECALLS=1` all validate. The contract then carries
+only the digest-bound one-shot attestation. The middleware consumes the single
+`recall_structured` allowance before dispatch, so failure and concurrency cannot
+turn one authorization into two reads.

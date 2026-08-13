@@ -42,6 +42,7 @@ import math
 import os
 import sqlite3
 from collections import OrderedDict
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -369,6 +370,9 @@ class EmbeddingEngine:
 
     def __init__(self, config: dict):
         self.v3_runtime = None
+        self.read_only_drill = parse_bool(
+            config.get("mcp_read_drill_enabled", False), default=False
+        )
         # 进程内小容量 LRU：provider 输入摘要 -> embedding。缓存键不能保留完整
         # 桶正文；后端只会看到前 _MAX_INPUT_CHARS 个字符，identity 也必须遵守
         # 同一个边界，否则长桶会白白滞留在 512 MiB 实例内存中。
@@ -396,6 +400,10 @@ class EmbeddingEngine:
         self.model: str = ""
 
         if not enabled_cfg:
+            if self.read_only_drill:
+                raise RuntimeError(
+                    "O2-J read-only process requires an enabled embedding index"
+                )
             # 显式关闭：no-op 模式，仍初始化 db 让 list_all_ids 能跑
             self._init_db()
             return
@@ -421,6 +429,10 @@ class EmbeddingEngine:
             api_key = "ollama"
 
         if not api_key:
+            if self.read_only_drill:
+                raise RuntimeError(
+                    "O2-J read-only process requires an embedding provider credential"
+                )
             # 无 key（仅云端后端会走到这）→ 待机模式：enabled=False，DB 仍初始化，key 热更新后激活
             logger.warning("[embedding] enabled=true but no api_key — starting in standby (disabled); set OMBRE_EMBED_API_KEY to activate")
             self._init_db()
@@ -495,17 +507,89 @@ class EmbeddingEngine:
         self.model = self._backend.model_name()
         self.enabled = True
 
-        # 5) 初始化 SQLite + 校验元数据
-        self._init_db()
-        self._check_meta_consistency()
+        # 5) 普通进程可迁移 SQLite；O2-J 专用进程只接受已存在、完整且
+        # 与当前 provider 匹配的索引。immutable=1 保证查询连接不会创建
+        # journal/WAL sidecar、做热日志恢复或改写数据库页。
+        if self.read_only_drill:
+            self._validate_read_only_drill_db()
+        else:
+            self._init_db()
+            self._check_meta_consistency()
 
     def attach_v3_runtime(self, runtime) -> None:
         self.v3_runtime = runtime
 
     # -------------------- SQLite 初始化 --------------------
 
+    def _connect_db(self, *, read_only: bool = False) -> sqlite3.Connection:
+        if self.read_only_drill or read_only:
+            uri = Path(self.db_path).resolve().as_uri() + "?mode=ro&immutable=1"
+            connection = sqlite3.connect(uri, uri=True)
+            connection.execute("PRAGMA query_only = ON")
+            return connection
+        return sqlite3.connect(self.db_path)
+
+    def _require_writable(self) -> None:
+        if self.read_only_drill:
+            raise RuntimeError("O2-J read-only process forbids embedding index writes")
+
+    def _validate_read_only_drill_db(self) -> None:
+        path = Path(self.db_path)
+        if path.is_symlink() or not path.is_file():
+            raise RuntimeError(
+                "O2-J read-only process requires a real prebuilt embedding database"
+            )
+        try:
+            conn = self._connect_db(read_only=True)
+            try:
+                columns = {
+                    str(row[1])
+                    for row in conn.execute("PRAGMA table_info(embeddings)").fetchall()
+                }
+                required = {
+                    "bucket_id",
+                    "embedding",
+                    "meaning_embedding",
+                    "content_hash",
+                }
+                if not required.issubset(columns):
+                    raise RuntimeError("embedding schema is incomplete")
+                meta = {
+                    str(key): str(value)
+                    for key, value in conn.execute(
+                        "SELECT key, value FROM embeddings_meta"
+                    ).fetchall()
+                }
+                count = int(
+                    conn.execute(
+                        "SELECT COUNT(*) FROM embeddings "
+                        "WHERE TRIM(embedding) <> '' OR meaning_embedding IS NOT NULL"
+                    ).fetchone()[0]
+                )
+            finally:
+                conn.close()
+        except (sqlite3.Error, OSError, RuntimeError) as exc:
+            raise RuntimeError(
+                "O2-J read-only embedding index validation failed"
+            ) from exc
+        if count <= 0:
+            raise RuntimeError("O2-J read-only embedding index is empty")
+        if not self._backend:
+            raise RuntimeError("O2-J read-only embedding backend is unavailable")
+        model_name = meta.get("model_name", "")
+        vector_dim = meta.get("vector_dim", "")
+        if (
+            not model_name
+            or _norm_model(model_name) != _norm_model(self._backend.model_name())
+            or vector_dim != str(self._backend.vector_dim())
+        ):
+            raise RuntimeError(
+                "O2-J read-only embedding index metadata does not match provider"
+            )
+
     def _init_db(self) -> None:
         """建表。embeddings 主表 + embeddings_meta 元数据表（2.0.3 新增）。"""
+        self._require_writable()
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         conn = sqlite3.connect(self.db_path)
         try:
@@ -543,7 +627,7 @@ class EmbeddingEngine:
             conn.close()
 
     def _read_meta(self) -> dict[str, str]:
-        conn = sqlite3.connect(self.db_path)
+        conn = self._connect_db()
         try:
             rows = conn.execute("SELECT key, value FROM embeddings_meta").fetchall()
             return {k: v for k, v in rows}
@@ -551,6 +635,7 @@ class EmbeddingEngine:
             conn.close()
 
     def _write_meta(self, key: str, value: str) -> None:
+        self._require_writable()
         conn = sqlite3.connect(self.db_path)
         try:
             conn.execute(
@@ -654,6 +739,7 @@ class EmbeddingEngine:
 
     async def generate_and_store(self, bucket_id: str, content: str) -> bool:
         """为内容生成 embedding 并存入 SQLite。成功返回 True。"""
+        self._require_writable()
         if not self.enabled or not content or not content.strip():
             return False
         try:
@@ -670,6 +756,7 @@ class EmbeddingEngine:
     def _store_embedding(
         self, bucket_id: str, embedding: list[float], content_hash: str = ""
     ) -> None:
+        self._require_writable()
         try:
             from utils import now_iso  # type: ignore
         except ImportError:
@@ -695,6 +782,7 @@ class EmbeddingEngine:
         与 content 的向量分列存储，互不覆盖；桶可能还没有 content 向量行
         （outbox 还在排队），所以用 upsert 而不是要求行已存在。
         """
+        self._require_writable()
         if not self.enabled or not meaning_text or not meaning_text.strip():
             return False
         try:
@@ -708,6 +796,7 @@ class EmbeddingEngine:
             return False
 
     def _store_meaning_embedding(self, bucket_id: str, embedding: list[float]) -> None:
+        self._require_writable()
         try:
             from utils import now_iso  # type: ignore
         except ImportError:
@@ -726,6 +815,7 @@ class EmbeddingEngine:
             conn.close()
 
     def delete_embedding(self, bucket_id: str) -> None:
+        self._require_writable()
         conn = sqlite3.connect(self.db_path)
         try:
             conn.execute("DELETE FROM embeddings WHERE bucket_id = ?", (bucket_id,))
@@ -735,7 +825,7 @@ class EmbeddingEngine:
 
     def list_all_ids(self) -> list[str]:
         """孤儿对账用：embeddings 表里所有 bucket_id。"""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._connect_db()
         try:
             rows = conn.execute("SELECT bucket_id FROM embeddings").fetchall()
             return [r[0] for r in rows]
@@ -744,6 +834,7 @@ class EmbeddingEngine:
 
     def delete_meaning_embedding(self, bucket_id: str) -> None:
         """清空 meaning 派生列，保留同桶的 content 向量。"""
+        self._require_writable()
         conn = sqlite3.connect(self.db_path)
         try:
             conn.execute(
@@ -768,7 +859,7 @@ class EmbeddingEngine:
         ``content_hash`` after the schema migration while still holding a valid
         vector. Inspecting the vector column keeps those two states distinct.
         """
-        conn = sqlite3.connect(self.db_path)
+        conn = self._connect_db()
         try:
             rows = conn.execute(
                 "SELECT bucket_id FROM embeddings WHERE TRIM(embedding) <> ''"
@@ -779,7 +870,7 @@ class EmbeddingEngine:
 
     def list_content_hashes(self) -> dict[str, str]:
         """Return hashes recorded by new writes; legacy rows contain ``""``."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._connect_db()
         try:
             rows = conn.execute(
                 "SELECT bucket_id, content_hash FROM embeddings"
@@ -789,7 +880,7 @@ class EmbeddingEngine:
             conn.close()
 
     def get_content_hash(self, bucket_id: str) -> str:
-        conn = sqlite3.connect(self.db_path)
+        conn = self._connect_db()
         try:
             row = conn.execute(
                 "SELECT content_hash FROM embeddings WHERE bucket_id = ?", (bucket_id,)
@@ -799,7 +890,7 @@ class EmbeddingEngine:
             conn.close()
 
     async def get_embedding(self, bucket_id: str) -> list[float] | None:
-        conn = sqlite3.connect(self.db_path)
+        conn = self._connect_db()
         try:
             row = conn.execute(
                 "SELECT embedding FROM embeddings WHERE bucket_id = ?", (bucket_id,)
@@ -827,7 +918,7 @@ class EmbeddingEngine:
 
         # Preserve the old behaviour of not calling the provider for an empty
         # index, without retaining any embedding payload across the await.
-        conn = sqlite3.connect(self.db_path)
+        conn = self._connect_db()
         try:
             has_rows = conn.execute("SELECT 1 FROM embeddings LIMIT 1").fetchone()
         finally:
@@ -849,7 +940,7 @@ class EmbeddingEngine:
         top_results: list[tuple[float, int, str]] = []
         row_index = 0
         query_dim = len(query_embedding)
-        conn = sqlite3.connect(self.db_path)
+        conn = self._connect_db()
         try:
             cursor = conn.execute(
                 "SELECT bucket_id, embedding, meaning_embedding FROM embeddings"
@@ -1005,7 +1096,7 @@ class EmbeddingEngine:
                 "embedding_count": 0,
             }
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._connect_db()
             try:
                 cnt = conn.execute("SELECT COUNT(*) FROM embeddings").fetchone()[0]
             finally:

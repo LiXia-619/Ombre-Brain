@@ -13,8 +13,11 @@ import contextlib
 import hashlib
 import json
 import os
+import re
+import threading
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable, Mapping
 import httpx
 from starlette.middleware.cors import CORSMiddleware
@@ -113,6 +116,112 @@ class MCPReadExposurePreflight:
     @property
     def go(self) -> bool:
         return self.decision == "GO"
+
+
+@dataclass(frozen=True)
+class MCPReadDrillPreflight:
+    """Sanitized O2-J one-shot authorization verdict."""
+
+    decision: str
+    reason_codes: tuple[str, ...]
+    authorization_digest: str | None
+    expires_at: str | None
+    max_structured_recalls: int
+
+    @property
+    def go(self) -> bool:
+        return self.decision == "GO"
+
+
+def assess_mcp_read_drill(
+    read_exposure: MCPReadExposurePreflight,
+    config: Mapping[str, Any],
+    *,
+    now: datetime | None = None,
+) -> MCPReadDrillPreflight:
+    """Require a short-lived, exact one-shot authorization on top of O2-I."""
+
+    reasons: set[str] = set()
+    enabled = parse_bool(config.get("mcp_read_drill_enabled", False), default=False)
+    authorization_digest = str(
+        config.get("mcp_read_drill_authorization_digest", "") or ""
+    ).strip()
+    expires_text = str(config.get("mcp_read_drill_expires_at", "") or "").strip()
+    try:
+        max_recalls = int(config.get("mcp_read_drill_max_recalls", 1))
+    except (TypeError, ValueError, OverflowError):
+        max_recalls = 0
+    current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    expires = _parse_utc_instant(expires_text)
+
+    if not enabled:
+        reasons.add("drill-disabled")
+    if not read_exposure.go:
+        reasons.add("o2i-read-exposure-not-ready")
+    if not re.fullmatch(r"[a-f0-9]{64}", authorization_digest):
+        reasons.add("authorization-digest-invalid")
+    if expires is None:
+        reasons.add("authorization-expiry-invalid")
+    elif expires <= current:
+        reasons.add("authorization-expired")
+    elif expires > current + timedelta(minutes=15):
+        reasons.add("authorization-window-too-wide")
+    if max_recalls != 1:
+        reasons.add("single-recall-required")
+
+    ordered = tuple(sorted(reasons))
+    return MCPReadDrillPreflight(
+        decision="GO" if not ordered else "NO-GO",
+        reason_codes=ordered,
+        authorization_digest=authorization_digest if not ordered else None,
+        expires_at=(expires.isoformat().replace("+00:00", "Z") if expires and not ordered else None),
+        max_structured_recalls=1,
+    )
+
+
+class MCPReadDrillGuard:
+    """Atomically consume the only O2-J structured recall before dispatch."""
+
+    def __init__(
+        self,
+        preflight: MCPReadDrillPreflight,
+        *,
+        now: Callable[[], datetime] | None = None,
+    ) -> None:
+        if not preflight.go or not preflight.authorization_digest or not preflight.expires_at:
+            raise ValueError("O2-J drill guard requires a GO preflight")
+        expires = _parse_utc_instant(preflight.expires_at)
+        if expires is None:
+            raise ValueError("O2-J drill guard expiry is invalid")
+        self.authorization_digest = preflight.authorization_digest
+        self.expires_at = expires
+        self._now = now or (lambda: datetime.now(timezone.utc))
+        self._consumed = False
+        self._revoked = False
+        self._lock = threading.Lock()
+
+    def consume_recall(self) -> bool:
+        with self._lock:
+            current = self._now().astimezone(timezone.utc)
+            if self._revoked or self._consumed or current >= self.expires_at:
+                return False
+            self._consumed = True
+            return True
+
+    def revoke(self) -> None:
+        with self._lock:
+            self._revoked = True
+
+
+def _parse_utc_instant(value: str) -> datetime | None:
+    try:
+        normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
+        parsed = datetime.fromisoformat(normalized)
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(timezone.utc)
 
 
 def assess_mcp_read_exposure(
@@ -267,6 +376,7 @@ class MCPAuthMiddleware:
         static_token_validator: TokenValidator | None = None,
         read_only_token_validator: TokenValidator | None = None,
         read_only_tools: frozenset[str] = frozenset(),
+        read_only_drill_guard: MCPReadDrillGuard | None = None,
         auth_mode: str = "oauth",
         path_matcher: Callable[[object], bool] = is_mcp_endpoint_path,
         resource_path: str = "/mcp",
@@ -278,6 +388,7 @@ class MCPAuthMiddleware:
         self.static_token_validator = static_token_validator
         self.read_only_token_validator = read_only_token_validator
         self.read_only_tools = frozenset(read_only_tools)
+        self.read_only_drill_guard = read_only_drill_guard
         self.auth_mode = (
             auth_mode if auth_mode in ("oauth", "token", "hybrid") else "oauth"
         )
@@ -370,6 +481,13 @@ class MCPAuthMiddleware:
                     }
                 )
                 return
+            if self.read_only_drill_guard is not None and not read_only:
+                await self._send_read_only_denial(
+                    send,
+                    None,
+                    "one-shot drill process accepts only the read-only credential",
+                )
+                return
             if read_only:
                 await self._call_read_only(scope, receive, send)
                 return
@@ -392,9 +510,19 @@ class MCPAuthMiddleware:
         allowed_methods = {"initialize", "notifications/initialized", "ping", "tools/list"}
         if method == "tools/call":
             params = request.get("params") if isinstance(request.get("params"), dict) else {}
-            if params.get("name") not in self.read_only_tools:
+            tool_name = params.get("name")
+            if tool_name not in self.read_only_tools:
                 await self._send_read_only_denial(
                     send, request.get("id"), "read-only credential cannot call this tool"
+                )
+                return
+            if (
+                tool_name == "recall_structured"
+                and self.read_only_drill_guard is not None
+                and not self.read_only_drill_guard.consume_recall()
+            ):
+                await self._send_read_only_denial(
+                    send, request.get("id"), "one-shot drill authorization unavailable"
                 )
                 return
         elif method not in allowed_methods:
@@ -730,6 +858,7 @@ class RuntimeLifecycle:
     """Own background service startup and shutdown for one HTTP app lifespan."""
 
     logger: Any
+    read_only_drill: bool = False
     decay_engine: Any = None
     embedding_outbox: Any = None
     ensure_ollama_child: AsyncCallback | None = None
@@ -801,6 +930,11 @@ class RuntimeLifecycle:
         if self._started:
             return
         self._started = True
+        if self.read_only_drill:
+            self.logger.info(
+                "O2-J read-only lifecycle active; all background writers are disabled"
+            )
+            return
         self._start_optional_services()
         await self._run_async_step(
             "decay engine start",
@@ -822,6 +956,8 @@ class RuntimeLifecycle:
         if not self._started:
             return
         self._started = False
+        if self.read_only_drill:
+            return
 
         task = self._keepalive_task
         self._keepalive_task = None
@@ -880,6 +1016,7 @@ def build_http_app(
     static_token_validator: TokenValidator | None = None,
     read_only_token_validator: TokenValidator | None = None,
     read_only_tools: frozenset[str] = frozenset(),
+    read_only_drill_guard: MCPReadDrillGuard | None = None,
 ) -> Any:
     """Build the HTTP (streamable-http) ASGI app with one consistent middleware stack."""
 
@@ -918,6 +1055,7 @@ def build_http_app(
         static_token_validator=static_token_validator,
         read_only_token_validator=read_only_token_validator,
         read_only_tools=read_only_tools,
+        read_only_drill_guard=read_only_drill_guard,
         auth_mode=settings.auth_mode,
         path_matcher=mcp_path_matcher,
         resource_path="/mcp",

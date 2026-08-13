@@ -420,6 +420,10 @@ def load_config(config_path: Optional[str] = None) -> dict:
         "mcp_token": "",
         "mcp_read_enabled": False,
         "vault_id": "",
+        "mcp_read_drill_enabled": False,
+        "mcp_read_drill_authorization_digest": "",
+        "mcp_read_drill_expires_at": "",
+        "mcp_read_drill_max_recalls": 1,
         "buckets_dir": os.path.join(project_root, "buckets"),
         "merge_threshold": 75,
         "dehydration": {
@@ -610,6 +614,34 @@ def load_config(config_path: Optional[str] = None) -> dict:
             default=False,
         )
     _apply_env_override(config, "OMBRE_VAULT_ID", "vault_id")
+    _env_mcp_read_drill_enabled = os.environ.get(
+        "OMBRE_MCP_READ_DRILL_ENABLED", ""
+    ).strip()
+    if _env_mcp_read_drill_enabled:
+        config["mcp_read_drill_enabled"] = parse_bool(
+            _env_mcp_read_drill_enabled,
+            default=False,
+        )
+    else:
+        config["mcp_read_drill_enabled"] = parse_bool(
+            config.get("mcp_read_drill_enabled", False),
+            default=False,
+        )
+    _apply_env_override(
+        config,
+        "OMBRE_MCP_READ_DRILL_AUTHORIZATION_DIGEST",
+        "mcp_read_drill_authorization_digest",
+    )
+    _apply_env_override(
+        config,
+        "OMBRE_MCP_READ_DRILL_EXPIRES_AT",
+        "mcp_read_drill_expires_at",
+    )
+    _apply_env_override(
+        config,
+        "OMBRE_MCP_READ_DRILL_MAX_RECALLS",
+        "mcp_read_drill_max_recalls",
+    )
 
     # 安全兜底：选了 token 模式却没配密钥——宁可继续用更强的 OAuth 兜底，也不要让用户
     # 误以为已经开了保护、实际上 /mcp 会因校验函数拿不到密钥而被意外锁死或裸奔。

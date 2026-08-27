@@ -7,8 +7,8 @@
     },
     {
       "path": "frontend/dashboard.html",
-      "sha256": "8c05dd56c2c2aefdde031eafb8962d8586d199f7a7f0a81a4e6cdc19b163ad8b",
-      "size": 571464
+      "sha256": "baeba3932f5627838f24985d9ae9f5083dc52b065e5bff772abc68a7ee4d579c",
+      "size": 572491
     },
     {
       "path": "frontend/favicon.svg",
@@ -1067,8 +1067,8 @@
     },
     {
       "path": "src/web/buckets.py",
-      "sha256": "dc274b205d6e47d51eb4e13747c811d67b4f97f12ad9e2a6e853944afabc34d0",
-      "size": 50062
+      "sha256": "719672ec9fe0bbb9a4085ae0f726c94e507154cfb17aeee9729850d663332ace",
+      "size": 50658
     },
     {
       "path": "src/web/config_api.py",

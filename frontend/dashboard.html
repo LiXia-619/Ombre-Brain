@@ -1933,6 +1933,19 @@
     padding: 2px 7px;
     border-radius: 2px;
   }
+  .self-entry-state {
+    font-size: 10px;
+    letter-spacing: 0.4px;
+    color: var(--text-light);
+    border: 1px solid var(--text-light);
+    border-radius: 2px;
+    padding: 1px 6px;
+    opacity: 0.85;
+  }
+  /* 淡化而不是隐藏：这条不再是它现在的看法，但一个字都没删。 */
+  .self-entry-retired .self-entry-content {
+    opacity: 0.55;
+  }
   .self-entry-time {
     font-family: 'Share Tech Mono', monospace;
     font-size: 10px;
@@ -10791,8 +10804,20 @@ function renderSelfEntries() {
     const aspectHtml = e.aspect
       ? '<span class="self-entry-aspect">' + esc(e.aspect) + '</span>'
       : '';
-    return '<div class="self-entry">'
-      + '<div class="self-entry-meta">' + aspectHtml + '<span class="self-entry-time">' + esc(ts) + '</span></div>'
+    // 一条被取代/被质疑的条目和一条当前信念长得一样，就等于没标。
+    var stateHtml = '';
+    var retired = '';
+    if (e.superseded_by) {
+      stateHtml = '<span class="self-entry-state">已被 ' + esc(e.superseded_by) + ' 取代</span>';
+      retired = ' self-entry-retired';
+    } else if (e.disputed_by && e.disputed_by.length) {
+      stateHtml = '<span class="self-entry-state">正在改这条主意</span>';
+      retired = ' self-entry-retired';
+    } else if (e.sedimented === false) {
+      stateHtml = '<span class="self-entry-state">未经沉淀</span>';
+    }
+    return '<div class="self-entry' + retired + '">'
+      + '<div class="self-entry-meta">' + aspectHtml + stateHtml + '<span class="self-entry-time">' + esc(ts) + '</span></div>'
       + '<div class="self-entry-content">' + esc(e.content) + '</div>'
       + '</div>';
   }).join('');

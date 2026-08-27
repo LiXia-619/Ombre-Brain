@@ -38,6 +38,37 @@ if not os.environ.get("OMBRE_EMBED_API_KEY"):
 # Ensure src/ is importable
 sys.path.insert(0, str(_REPO_ROOT / "src"))
 
+_MISSING = object()
+
+
+@pytest.fixture(autouse=True)
+def _restore_tool_runtime():
+    """每个测试跑完，把 tools/_runtime 的全局装配还原。
+
+    二十多个测试文件直接写 `rt.embedding_engine = ...` 而不是走 monkeypatch，
+    于是它留给下一个测试。后果是**静默的**：dream 的 feel 段按融合分挑选，
+    向量可用时是 `0.7*向量 + 0.3*关键词`，不可用时关键词独自承担。继承到一个
+    「enabled 但查不出东西」的引擎，向量那路恒为 0，门槛就变成事实上的 1.67 倍，
+    整段 feel 无声消失——测试不报错，只是断言的东西不见了。
+
+    这不是假想：`test_feel_search_channel.py` 之后跟 `test_dream_prompt_boundary.py`，
+    两个文件两秒就能复现两条失败；随机序下命中率约五分之一。
+
+    在这里还原而不是去改那二十多个文件：装配是全局的，边界就该在 conftest，
+    而不是指望每个新测试都记得自己收拾。
+    """
+    from tools import _runtime as rt
+
+    # 全量快照，不挑名字：装配槽以后会增减，漏跟一个就是同一个静默 bug 再来一次。
+    # 从没被改过的（含 typing 那些 import）身份比较相等，还原是空操作。
+    before = dict(vars(rt))
+    yield
+    for name, value in before.items():
+        if getattr(rt, name, _MISSING) is not value:
+            setattr(rt, name, value)
+    for name in set(vars(rt)) - set(before):
+        delattr(rt, name)
+
 
 @pytest.fixture
 def test_config(tmp_path):

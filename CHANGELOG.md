@@ -76,6 +76,18 @@ B 认知链、C 候选滞留可见性。**A 没有采纳**，理由写在下面�
 
 ### 内部 / Internal
 
+- **测试隔离：`tools/_runtime` 的全局装配现在每个测试后还原**（`conftest.py`
+  的 autouse fixture）。二十多个测试文件直接写 `rt.embedding_engine = ...`
+  而不是走 monkeypatch，于是它留给下一个测试。后果是**静默的**：dream 的 feel 段
+  向量可用时按 `0.7*向量 + 0.3*关键词` 挑选，继承到一个「enabled 但查不出东西」
+  的引擎后，向量那路恒为 0，门槛变成事实上的 1.67 倍，整段 feel 无声消失——
+  不报错，只是断言的东西不见了。
+  - 复现：`pytest tests/test_feel_search_channel.py tests/test_dream_prompt_boundary.py`，
+    两秒两条失败。随机序下命中率约五分之一，3.8.0 上一样复现（既有问题）。
+  - 在 conftest 还原而不是去改那二十多个文件：装配是全局的，边界就该在
+    conftest，而不是指望每个新测试都记得自己收拾。
+  - 这是本仓库第三个同族问题（前两个是 `OMBRE_DASHBOARD_PASSWORD` 泄漏、
+    以及本次这个），共同的形状都是「直接写全局，monkeypatch 管不着」。
 - 新增 17 个用例，分三个文件（`test_i_supersedes.py` /
   `test_i_stall_diagnostic.py` / `test_hook_self_supersession.py`）。
 - `I(read=True)` 的 `limit` 现在管「当前信念」，折叠的两段各自也有上限——

@@ -151,3 +151,26 @@ async def test_ready_candidates_are_listed_compactly(env):
     assert candidate_id in out
     # 压成一行的不算见证：它需要的是模型去 promote，不是再看一遍。
     assert env.buckets[candidate_id]["metadata"]["i_dream_dates"] == dates
+
+
+@pytest.mark.asyncio
+async def test_ready_candidates_alone_do_not_short_circuit_the_dream(env):
+    """没有近期记忆、只剩攒够的候选时，dream 不该整段短路。
+
+    上面那条用例垫了 `_recent_memory`，而短路只在**没有**近期记忆时发生——
+    于是「所有候选都攒够」这个最该提醒的时刻，反而是唯一提醒不出来的时刻。
+    """
+    candidate_id = await _a_candidate(env)
+    old = (datetime.now() - timedelta(days=30)).isoformat()
+    await env.update(
+        candidate_id,
+        i_dream_dates=["2026-08-01", "2026-08-02", "2026-08-03"],
+        created=old,
+        last_active=old,
+    )
+
+    out = await dream.dispatch(window_hours=48)
+
+    assert "没有需要消化的新记忆" not in out
+    assert "已经攒够见证" in out
+    assert candidate_id in out

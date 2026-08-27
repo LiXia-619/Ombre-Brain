@@ -34,6 +34,7 @@ import logging
 import re
 from typing import Any, Mapping
 
+from ombrebrain.storage.letter_lock import letter_is_open_to_ai
 from ombrebrain.storage.source_store import source_links_from_metadata
 from utils import count_tokens_approx, parse_bool
 
@@ -680,7 +681,20 @@ class ThemService:
                 raise ValueError(f"找不到记忆桶 {bucket_id}，无法作为依据。")
             metadata = dict(bucket.get("metadata") or {})
             bucket_type = str(metadata.get("type") or "dynamic").strip().lower()
-            if bucket_type in _IGNORED_BUCKET_TYPES:
+            if bucket_type == "letter":
+                # 3.8.0：信可以当依据，但只限**对 AI 已经开着**的那些。
+                #
+                # 放开的理由：有人每天把日记写进 letter，那就是他关于这些人最厚
+                # 的一手材料；一概拒掉等于让 them 在这种用法下根本没法用。
+                #
+                # 仍然挡住上锁的：否则模型能拿一封自己还读不到的信去撑一条认识，
+                # 而且「这封信里有没有出现某个名字」这种报错本身就是一次泄漏。
+                if not letter_is_open_to_ai(bucket):
+                    raise ValueError(
+                        f"{bucket_id} 是还没对你开放的信，不能作为依据。"
+                        "等它解锁之后再用，或者换一条现在就读得到的记忆。"
+                    )
+            elif bucket_type in _IGNORED_BUCKET_TYPES:
                 raise ValueError(f"{bucket_id} 是 {bucket_type} 类型，不能作为 them 的依据。")
             provenance = metadata.get("provenance")
             if isinstance(provenance, dict) and parse_bool(
@@ -690,10 +704,22 @@ class ThemService:
             body = str(bucket.get("content") or "").strip()
             if not body:
                 raise ValueError(f"{bucket_id} 没有正文，不能作为依据。")
-            folded = body.casefold()
+            # 标题与桶名也算「指明是谁」。
+            #
+            # 这条规则的原话是「一条依据自己都指不明白是谁，就不该拿来撑一条
+            # 关于谁的判断」。一篇标题写着「和 Zoey 的晚饭」、正文用「她」承接
+            # 的日记——它指明了。原先只翻 body，把这种最常见的日记文体整个拒在
+            # 门外，而那不是规则要挡的东西。
+            #
+            # 门槛一点没降：仍然是**每个桶都要指明**，不是「至少一个」；
+            # 只是承认标题也是这个桶自己的话。
+            folded = "\n".join(
+                str(part or "")
+                for part in (body, metadata.get("title"), metadata.get("name"))
+            ).casefold()
             if not any(name in folded for name in person.name_keys):
                 raise ValueError(
-                    f"{bucket_id} 的正文里没有出现{person.display_name}"
+                    f"{bucket_id} 的正文和标题里都没有出现{person.display_name}"
                     f"（登记的称呼：{'、'.join(person.names)}）。"
                     "关于一个人的认识，每一条依据都得指明是谁——"
                     "换一条写了名字的记忆，或者先把这个称呼补进 names。"

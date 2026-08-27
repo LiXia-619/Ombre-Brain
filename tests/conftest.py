@@ -40,6 +40,25 @@ sys.path.insert(0, str(_REPO_ROOT / "src"))
 
 _MISSING = object()
 
+# 别让迁移工作区的清扫线程在测试进程里真的跑起来。
+#
+# 它是进程级 daemon，起来之后跑满整个 pytest 进程：每 60 秒醒一次，按当时读到的
+# `_PARSED_WORKSPACE_TTL_SECONDS` 去删所有已注册 engine 的未应用工作区。而
+# `test_migrate_job_state.py` 会把那个模块级常量 monkeypatch 成 10 秒——两件事
+# 撞上就是一次谁也复现不了的删除：线程按自己的节拍醒，和测试顺序无关，
+# 所以表现成低频、换种子也不稳定的偶发失败。
+#
+# 没有测试需要它真的在后台跑：要测过期的那条用例是直接调
+# `engine._expire_parsed_workspace(...)` 的。而且 migrate_engine 本身就为
+# 「起不来 daemon」留了惰性回退（status/reservation 调用里也会做同样的过期检查），
+# 所以关掉它不改变任何被测行为。
+try:
+    import migrate_engine as _migrate_engine
+
+    _migrate_engine._MIGRATE_SWEEPER_STARTED = True
+except Exception:  # pragma: no cover - 模块结构变了不该让整个套件起不来
+    pass
+
 
 @pytest.fixture(autouse=True)
 def _restore_tool_runtime():

@@ -562,20 +562,45 @@ Dashboard 的既有 `/api/letter/{letter_id}` PATCH 同时承载两类互斥请�
 
 ### 3.11 `I` — 自我认知条目（iter 2.x）
 
-签名：`I(content="", aspect="", read=False, limit=20, promote="")`
+签名：`I(content="", aspect="", read=False, limit=20, promote="", supersedes="")`
 
 实现在 `src/tools/i/`（`dispatch = i_core`）。语义：「我写下关于我自己的认识」——不是「时间里发生的事」，而是模型对自身本质/规律/变化的观察。**`I` 是沉淀物不是日记**：想法先当普通记忆活着，经 dream 反复碰撞后才可能升级进 `I`（哲学边界见 `rule.md` 第 13.1 条）。
 
 - `content` 非空 → **写候选**。创建一条普通 `dynamic` 桶，tag `__i_candidate__`（刻意不是 `__i__`）、`i_stage="candidate"`、`i_dream_dates=[]`。候选照常浮现和衰减；在 dream 的普通近期记忆段仍受 `window_hours` 限制，但待沉淀候选段不受该时间窗限制，避免旧候选永久失去三次跨日见证的机会。`aspect` 可选维度：`nature`(本质) / `values`(看重的) / `patterns`(规律) / `limits`(局限) / `becoming`(在变成什么) / `uncertainty`(不确定的) / `stance`(立场)。
-- `content` 空 或 `read=True` → **读取模式**，返回正式条目（按 `limit` 截断，默认 20 条）＋ 待沉淀候选清单；没有 `i_from_candidate` 的历史条目标注为「早期直接写入，未经沉淀」。
+- `content` 空 或 `read=True` → **读取模式**，返回三段正式条目（当前自我认知 / 我正在改的主意 / 已经被取代的，各自按 `limit` 截断）＋ 待沉淀候选清单；没有 `i_from_candidate` 的历史条目标注为「早期直接写入，未经沉淀」。折叠的两段也有上限：攒了几十条被取代的条目之后，当前信念不该被历史淹掉。
 - `promote="桶ID"` → **升级**。要求该候选的 `i_dream_dates` 已有 ≥ `I_PROMOTE_THRESHOLD`（3）个不同日期，否则拒绝并报告还差几次。通过后创建 `type="i"` 桶（`dont_surface=True`、`i_from_candidate`、继承 `i_dream_dates`），候选桶保留原文并改标 `i_stage="promoted"` / `i_promoted_to` / `resolved=True`。同时传 `content` 可用提炼后的措辞落成正式条目。
-- 正式 I 条目带 `dont_surface=True`：**不参与普通 `breath` / `dream`**；只在 `SessionStart` 时自动附带最近 3 条。
+- `supersedes="正式I条目ID"` → **声明取代**（3.9.0）。见下面 3.11.1。
+- 正式 I 条目带 `dont_surface=True`：**不参与普通 `breath` / `dream`**；只在 `SessionStart` 时自动附带最近 3 条——**被取代的和此刻正被质疑的不占这三个名额**。
+
+#### 3.11.1 取代与挂起（`supersedes`）
+
+要解决的不是「旧条目没标时间」（`I(read=True)` 和 SessionStart 注入都带日期），
+而是**门槛不对称**：早期正式条目是直写免检进来的，而要推翻其中一条，
+新认知得排 3 个不同自然日的见证。用 0 门槛进来的东西要用 3 天门槛才能推翻。
+
+- **写候选时声明**（`I(content=..., supersedes=旧id)`）：候选记 `i_supersedes`，
+  旧条目的 `i_disputed_by` 追加这条候选的 id。旧条目**立刻**不再作为当前信念
+  被 SessionStart 注入，改成一行「你正在改其中 N 条对自己的看法」（不带正文——
+  带回来就等于没挪走）。**新条目的 3 次见证一次都不少。**
+- **挂起是动态算的**（`disputing_candidates(bucket, buckets_by_id)`），
+  不信任存下来的 flag：只有 `i_disputed_by` 里此刻还 `is_pending_candidate` 的
+  才算数。候选衰减归档或被放弃时，挂起自动解除——否则旧认知会被一个早已不存在
+  的念头永久悬着，那时模型**既没有旧的也没有新的**，比原来更糟。
+- **promote 时成链**：新条目写 `i_supersedes`，旧条目写 `i_superseded_by`，
+  旧的退出当前自我认知但一个字不删（`rule.md` 第 1 条）。
+  质疑标记不用清——候选转成 `i_stage="promoted"` 后动态判定自然失效。
+- **只能在同一 aspect 内取代**，且两边都标了 aspect 才管（早期直写条目大多没标，
+  不该因此永远没法被修正）。跨 aspect 不是迭代，是拿一个维度盖掉另一个。
+- **候选排队期间旧目标被别的条目取代时，不挡住 promote**：这条认知本身有效，
+  只是链接不上，照常升级并在返回里说明。显式传 `supersedes=` 则严格报错——
+  那是这次调用的输入，不是继承来的历史。
 
 dream 侧配合（`src/tools/dream/hints.py` + `output.py`）：
 
-- `collect_self_candidates(all_buckets, window_hours)` 收集全部待沉淀候选，不受普通记忆的 `window_hours` 限制；候选按创建时间从旧到新排列，并继续受最终输出 token 预算约束。用**已落盘向量**（不发新请求）为每条取相似度 ≥ 0.35 的前 3 条对照材料；对照池 = 全部正式 I 条目 + 全部其它候选 + 最近 200 条普通桶（排除 `letter`）。向量不可用时只列候选并明说。
+- `collect_self_candidates(all_buckets, window_hours)` 收集全部待沉淀候选，不受普通记忆的 `window_hours` 限制；**按「还差几次见证」排序**（3.8.0 起，不再是创建时间——旧的排在队首会把新候选永远挤出预算），攒够门槛的拆进 `ready`，其余取前 `_MAX_SELF_CANDIDATES_PER_DREAM`（5）条，并继续受最终输出 token 预算约束。用**已落盘向量**（不发新请求）为每条取相似度 ≥ 0.35 的前 3 条对照材料；对照池 = 全部正式 I 条目 + 全部其它候选 + 最近 200 条普通桶（排除 `letter`）。向量不可用时只列候选并明说。
 - 专用候选段排在 dream 其它上下文之后，受 `surfacing.dream_max_tokens` 预算约束；候选本身也可能作为普通近期记忆，或作为另一条候选的碰撞材料出现。
 - 见证计数由 `dream/__init__.py` 在最终输出渲染完成后调 `tools.i.record_dream_pass()` 写入，按不同日期去重。只要待沉淀候选的结构化记忆块实际出现在本次输出（近期记忆、候选主块或碰撞材料），就算一次见证；所有位置都因预算未展开时才不计次。
+- 同一处还调 `record_dream_offer(SelfReview.pending_ids)`，给**队列里的每一条**（包括这次没排上的）记一次「这天做过梦」，写进 `i_dream_offered`（按天去重，只存计数不存日期列表以免 metadata 无界增长）。见证数回答「被看见过几次」，这个数回答「本可以被看见几次」——只有前者时，「等了 13 天还是 0/3」既可能是没做几次梦（不是 bug），也可能是每场都没排到（是 bug），没法分辨。`I(read=True)` 把两者渲染成「已等 13 天、经历 8 场梦，一次都没排到」。
 - 碰撞只摆材料，**不做矛盾/重复判定**（认知层边界，`rule.md` 第 5 条）。
 
 ### 3.12 `You` — 默认隐藏的「我对你的认识」

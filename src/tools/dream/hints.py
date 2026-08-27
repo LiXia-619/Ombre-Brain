@@ -156,6 +156,11 @@ class SelfReview:
     ``rendered_ids`` 由 output.py 回写真正出现在最终文本中的候选（近期正文、
     候选主块或碰撞材料），dream 的 dispatch 只给它们记「被见证过一次」。
     压成一行的 ``ready`` 不算见证——那不是「和材料摆在一起看过」。
+
+    ``pending_ids`` 是这场梦**考虑过**的全部待沉淀候选，不管有没有被渲染。
+    它和 ``rendered_ids`` 的差额就是「这场梦它在队列里，但没被看见」。两个数
+    分开记，才能回答「一条候选攒不到见证，是因为梦做得少，还是因为梦做了
+    但它从来没排到」——前者不是 bug，后者是。
     """
 
     candidates: list[SelfCandidate] = field(default_factory=list)
@@ -164,6 +169,7 @@ class SelfReview:
     threshold: int = I_PROMOTE_THRESHOLD
     rendered_ids: list[str] = field(default_factory=list)
     starved: int = 0
+    pending_ids: list[str] = field(default_factory=list)
 
 
 def _timestamp_key(bucket: dict) -> str:
@@ -190,6 +196,12 @@ async def collect_self_candidates(all_buckets: list, window_hours: int) -> SelfR
     ]
     if not pending:
         return SelfReview()
+
+    # 在 `pending` 被下面的取舍改写之前先留一份全量 id：谁被展开是这场梦的
+    # 结果，谁在队列里是这场梦的事实，后者才是「它到底等了几场梦」的分母。
+    all_pending_ids = [
+        str(b.get("id") or "").strip() for b in pending if str(b.get("id") or "").strip()
+    ]
 
     # 按「还差几次见证」排，不按 created。
     #
@@ -230,6 +242,7 @@ async def collect_self_candidates(all_buckets: list, window_hours: int) -> SelfR
             for b in ready
         ],
         starved=starved,
+        pending_ids=all_pending_ids,
     )
     pending = growing
 

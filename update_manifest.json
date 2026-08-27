@@ -32,7 +32,7 @@
     },
     {
       "path": "src/VERSION",
-      "sha256": "88206afd2d9b56ca71466c85d1ed1421b1db0e78fa00072697918fb8a9ac54ef",
+      "sha256": "5c0f9e710d6f59bb59980444f3dc58886fc564a0a2d8a1d534d3296be2c67da8",
       "size": 6
     },
     {
@@ -832,8 +832,8 @@
     },
     {
       "path": "src/server.py",
-      "sha256": "f3d94acc325a1acaa1d89224dc7eaa82969ffad228651a70e7b0cb5863eddd57",
-      "size": 76678
+      "sha256": "0b4a655e4f010f4c156f06a1ae8f5765759aca73329e245ffd0a2b99ec48f59c",
+      "size": 77026
     },
     {
       "path": "src/server_app.py",
@@ -917,8 +917,8 @@
     },
     {
       "path": "src/tools/dream/__init__.py",
-      "sha256": "0c263921b241ef6f4346246c023f87d483575e2f0cb95115ace0ed5971137542",
-      "size": 3583
+      "sha256": "a2eb9d95e2c511f1abf3ab12a507882d05b9f0afcee8ecf2d21c0b945c1f7821",
+      "size": 4500
     },
     {
       "path": "src/tools/dream/candidates.py",
@@ -932,8 +932,8 @@
     },
     {
       "path": "src/tools/dream/hints.py",
-      "sha256": "7eca17655bf0341eae98287f8c6e43801aa662214846efae27a6b00dd99777a7",
-      "size": 13563
+      "sha256": "27ab9a6ae86c6549b815fd5b3dcbd7b79d5ebbb72dc83f5f8e93de755832b0f5",
+      "size": 14380
     },
     {
       "path": "src/tools/dream/output.py",
@@ -982,13 +982,13 @@
     },
     {
       "path": "src/tools/i/__init__.py",
-      "sha256": "2b47e68ce3764443038c379688fe8ed6072f897e92384f8a026ee2c1c93b9064",
-      "size": 997
+      "sha256": "a7a40a4e3783450a3514120aa27fbe851408e6c794e440aa69978e835babd215",
+      "size": 1066
     },
     {
       "path": "src/tools/i/core.py",
-      "sha256": "6c7ad7d663d0c1a381631859eb4a1e1a9e6f2fb83f5c1f79f213626bc17ad311",
-      "size": 14141
+      "sha256": "17e874eb483b2be346ab083c7f9ddd758a88e0caad0c4b5c0003378397c8b990",
+      "size": 26492
     },
     {
       "path": "src/tools/plan/__init__.py",
@@ -1092,8 +1092,8 @@
     },
     {
       "path": "src/web/hooks.py",
-      "sha256": "64a509a71e797da053b229e3f323d5d0066449f80d49b2f5d84ac1acd37ecf5b",
-      "size": 20586
+      "sha256": "e4a952c3e09bdad53884caef1881c64858dfc55c9902ca75cdc48c3dff511a66",
+      "size": 22571
     },
     {
       "path": "src/web/import_api.py",
@@ -1172,5 +1172,5 @@
     }
   ],
   "rollout_strategy": "single-node",
-  "version": "3.8.0"
+  "version": "3.9.0"
 }

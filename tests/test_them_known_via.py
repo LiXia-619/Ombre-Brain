@@ -149,6 +149,29 @@ async def test_human_registered_person_is_heard_from_user_and_visible(tmp_path):
     assert person.human_visible is True
 
 
+@pytest.mark.asyncio
+async def test_roster_carries_known_via_so_the_dashboard_can_group_by_it(tmp_path):
+    """名册要按「怎么认识的」分栏，那 `list_people` 就得把这个字段发出去。
+
+    前端一度只能看到 `origin`（谁登记的），于是模型登记、明写了
+    `heard_from_user` 的人照样被划进「自己遇到的」那一栏。
+    """
+    service = _enabled(tmp_path)
+    await _write(service, known_via=KNOWN_VIA_HEARD_FROM_USER)
+    service.add_person(["Iris"])
+
+    roster = {row["names"][0]: row for row in service.list_people()}
+
+    模型登记的 = next(row for row in roster.values() if row["origin"] == ORIGIN_MODEL)
+    assert 模型登记的["known_via"] == KNOWN_VIA_HEARD_FROM_USER
+    # 分栏能拿到来源，但可见性一个字没变：正文仍然不出这个接口。
+    assert "claims" not in 模型登记的
+
+    assert roster["Iris"]["known_via"] == KNOWN_VIA_HEARD_FROM_USER
+    assert roster["Iris"]["origin"] == ORIGIN_HUMAN
+    assert "claims" in roster["Iris"]
+
+
 def _age_receipts(service, claim):
     from dataclasses import replace
 

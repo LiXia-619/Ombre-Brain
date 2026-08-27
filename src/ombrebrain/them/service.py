@@ -320,6 +320,10 @@ class ThemService:
                 "names": list(person.names),
                 "revision": person.revision,
                 "origin": person.origin,
+                # 名册按「怎么认识的」分栏，那就得把这个字段发出去。它不是一条
+                # 认识，是认识的来源标记，和 origin 同类——13.3 挡的是认识、
+                # 依据、历史，不是这个。
+                "known_via": person.known_via,
                 "pending_notes": [dict(note) for note in person.pending_notes],
             }
             if person.human_visible:

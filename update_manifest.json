@@ -7,8 +7,8 @@
     },
     {
       "path": "frontend/dashboard.html",
-      "sha256": "baeba3932f5627838f24985d9ae9f5083dc52b065e5bff772abc68a7ee4d579c",
-      "size": 572491
+      "sha256": "7b9c6d7a686731516bcd6c0baad2452d59c57998c5d76c29fda73a2e43678ac0",
+      "size": 573902
     },
     {
       "path": "frontend/favicon.svg",
@@ -32,7 +32,7 @@
     },
     {
       "path": "src/VERSION",
-      "sha256": "5c0f9e710d6f59bb59980444f3dc58886fc564a0a2d8a1d534d3296be2c67da8",
+      "sha256": "b43b810226c9625fdb0d7aad91c019a8423b40c4a3d7a80562c3725ee7df7919",
       "size": 6
     },
     {
@@ -772,8 +772,8 @@
     },
     {
       "path": "src/ombrebrain/them/service.py",
-      "sha256": "bd8e0d9f60d3c08726914feba84b9da38b82710d8542006a98c78f557fa5ca4b",
-      "size": 56550
+      "sha256": "6fb6c4545d5a4a8f4c11df8cfe35de3b894c244fe81db0982a857106c34d105b",
+      "size": 56859
     },
     {
       "path": "src/ombrebrain/them/store.py",
@@ -1172,5 +1172,5 @@
     }
   ],
   "rollout_strategy": "single-node",
-  "version": "3.9.0"
+  "version": "3.9.1"
 }

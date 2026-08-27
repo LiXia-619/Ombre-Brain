@@ -4813,18 +4813,23 @@ function renderThemPeople() {
     box.innerHTML = '<p class="know-empty">还没有记住任何人。</p>';
     return;
   }
-  // 分组的依据不是「谁登记的」，是**怎么认识的**：听你说的 vs 自己遇到的。
-  // 这两种混在一张名单里就会张冠李戴，而人只有看得见才纠得了。
-  var 听说的 = [], 遇到的 = [];
+  // 分组的依据不是「谁登记的」，是**怎么认识的**——所以看 known_via，不看 origin。
+  //
+  // 这两件事在后端早就拆开了：origin 管人类看得见多少（模型改不动），
+  // known_via 管认识论上的来源（模型自己说了算）。前端一直只有 origin 一个
+  // 分支，于是模型登记的人不管明写了多少次 heard_from_user，都被划进
+  // 「自己遇到的」——而那正是转述来的二手信息最不该待的那一栏。
+  var 听说来的 = [], 亲自遇到的 = [];
   for (var i = 0; i < _themPeople.length; i++) {
-    (_themPeople[i].origin === 'human' ? 听说的 : 遇到的).push(_themPeople[i]);
+    (_themPeople[i].known_via === 'heard_from_user' ? 听说来的 : 亲自遇到的)
+      .push(_themPeople[i]);
   }
   var 名 = esc(aiName());
   box.innerHTML =
-      themGroupHtml('heard', '你告诉 ' + 名 + ' 的', 听说的,
-        名 + ' 没见过这些人，写下的每一句都来自你的转述——记岔了只有你认得出来。')
-    + themGroupHtml('met', 名 + ' 自己遇到的', 遇到的,
-        '第一手的印象。内容只属于 ' + 名 + '，你只看得到称呼。');
+      themGroupHtml('heard', '你告诉 ' + 名 + ' 的', 听说来的,
+        名 + ' 没见过这些人，写下的每一句都来自你的转述。')
+    + themGroupHtml('met', 名 + ' 自己遇到的', 亲自遇到的,
+        '第一手的印象。');
 }
 
 function themGroupHtml(kind, 标题, 人们, 说明) {
@@ -4836,7 +4841,10 @@ function themGroupHtml(kind, 标题, 人们, 说明) {
   for (var i = 0; i < 人们.length; i++) {
     var p = 人们[i];
     var 未读 = (p.pending_notes || []).length;
-    var 副 = kind === 'heard'
+    // 条数跟着「看不看得见」走，不跟着分栏走：这两件事拆开之后，
+    // 「你告诉它的」那一栏里也会有你看不见内容的人（模型自己登记、
+    // 但标了 heard_from_user 的），给他标个条数是假的。
+    var 副 = p.origin === 'human'
       ? ((p.claims || []).length ? (p.claims.length + ' 条') : '还没记下')
       : '';
     h += '<button class="know-row" onclick="openThemPerson(\'' + esc(p.person_id) + '\')">'
@@ -4857,7 +4865,11 @@ function renderThemPersonView() {
     if (_themPeople[i].person_id === _themPersonId) p = _themPeople[i];
   }
   if (!p) { backToThemRoster(); return; }
-  var 听说的 = p.origin === 'human';
+  // 两个独立的轴，别再用一个变量兼着：
+  //   听说来的 = 怎么认识的（known_via，模型说了算）→ 标题与措辞
+  //   可见     = 谁登记的（origin，模型改不动）    → 看得见多少、能不能留言
+  var 听说来的 = p.known_via === 'heard_from_user';
+  var 可见 = p.origin === 'human';
   var 名 = esc(aiName());
   var 别名 = (p.names || []).slice(1);
 
@@ -4869,13 +4881,16 @@ function renderThemPersonView() {
     h += '<div class="know-detail-alias">也叫：' + esc(别名.join('、')) + '</div>';
   }
   h += '<div class="know-detail-origin"><span class="know-ico">'
-     + _ICO[听说的 ? 'heard' : 'met'] + '</span><b>'
-     + (听说的 ? '你告诉 ' + 名 + ' 的' : 名 + ' 自己遇到的') + '</b></div>'
+     + _ICO[听说来的 ? 'heard' : 'met'] + '</span><b>'
+     + (听说来的 ? '你告诉 ' + 名 + ' 的' : 名 + ' 自己遇到的') + '</b></div>'
      + '<p class="know-detail-why">'
-     + (听说的
-        ? 名 + ' 没见过这个人，关于他的一切都是你转述的。所以这一页你看得见全文——'
-          + '记岔的地方只有你认得出来。'
-        : '第一手的印象，' + 名 + ' 自己写下的。内容不出这层边界，你只看得到称呼。')
+     + (听说来的
+        ? 名 + ' 没见过这个人，关于他的一切都是你转述的。'
+        : '第一手的印象，' + 名 + ' 自己写下的。')
+     // 看得见多少是另一回事，由「谁登记的」决定，跟上面那句不一定同向。
+     + (可见
+        ? '这个人是你登记的，所以这一页你看得见全文——记岔的地方只有你认得出来。'
+        : '这个人是 ' + 名 + ' 自己登记的，内容不出这层边界，你只看得到称呼。')
      + '</p>';
 
   h += '<div class="know-field"><div class="know-field-label">称呼</div>'
@@ -4889,10 +4904,13 @@ function renderThemPersonView() {
      + ' 会在下一次回想时被告知一次新旧对照——正文一个字不动，那些句子是 ' + 名 + ' 写的。</p>'
      + '</div>';
 
-  if (听说的) {
+  // 这一段是可见性，只能跟 origin。跟着 known_via 走的话，模型给自己登记的人
+  // 标一个 heard_from_user 就把私有认识交出来了——而那正是当初把两个字段
+  // 拆开要防的事（models.py 的 human_visible 有同样的说明）。
+  if (可见) {
     var claims = p.claims || [];
     h += '<div class="know-field"><div class="know-field-label">'
-       + 名 + ' 从你说的话里记下的</div>';
+       + (听说来的 ? 名 + ' 从你说的话里记下的' : 名 + ' 关于这个人记下的') + '</div>';
     if (claims.length) {
       h += '<ul class="know-claims">';
       for (var j = 0; j < claims.length; j++) {

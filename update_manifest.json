@@ -32,7 +32,7 @@
     },
     {
       "path": "src/VERSION",
-      "sha256": "3ad143a7bbc464452fea79e6f5614ab6a2d63e32a990a6880710d4f8cadeeb2c",
+      "sha256": "84746b20a3a72f6ff85a629706e50507c1bd200907456b76dd808a2a5ca0efba",
       "size": 6
     },
     {
@@ -557,8 +557,8 @@
     },
     {
       "path": "src/ombrebrain/policy/surfacing.py",
-      "sha256": "023d8a26691196141beb7eadf53052561faf1b4abc6cf0224427580c58492eb9",
-      "size": 4893
+      "sha256": "5013903a352955eed196a37253faed1ef8f4a37b7e1c2c5a21e0c77d24ab0b9b",
+      "size": 6568
     },
     {
       "path": "src/ombrebrain/policy/update_policy.py",
@@ -827,8 +827,8 @@
     },
     {
       "path": "src/server.py",
-      "sha256": "4851927b317fefc569d237a633378b010d1f402097eaf5427ee18a4b9c71cd44",
-      "size": 75166
+      "sha256": "f3d94acc325a1acaa1d89224dc7eaa82969ffad228651a70e7b0cb5863eddd57",
+      "size": 76678
     },
     {
       "path": "src/server_app.py",
@@ -867,8 +867,8 @@
     },
     {
       "path": "src/tools/breath/__init__.py",
-      "sha256": "9d60538f42aacf772f0b59c5c1dc4518212c82ec01dbb3491e5cccf5db6aa485",
-      "size": 8349
+      "sha256": "750231da19be70af1176b4be39a3ac295f0c3231d82fda3fa11afcc94533823c",
+      "size": 8571
     },
     {
       "path": "src/tools/breath/_date_range.py",
@@ -902,8 +902,8 @@
     },
     {
       "path": "src/tools/breath/search.py",
-      "sha256": "7a70b49a7576ba27b68ebb37f0c8713c4e8eb068ca40e557931b2ca6e2dfcfa8",
-      "size": 19015
+      "sha256": "f1b0b2f5f746ddcc493ff21bd920e3cc1ddde03ada93ac5f1085734570f80ed5",
+      "size": 21914
     },
     {
       "path": "src/tools/breath/surface.py",
@@ -1167,5 +1167,5 @@
     }
   ],
   "rollout_strategy": "single-node",
-  "version": "3.6.3"
+  "version": "3.7.0"
 }

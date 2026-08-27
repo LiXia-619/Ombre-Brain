@@ -2,6 +2,57 @@
 
 本项目版本号见根目录 `VERSION` 文件，Docker 镜像 tag 与之对应（`p0luz/ombre-brain:<VERSION>`）。
 
+## 3.7.0
+
+> 把 Ombre 当 agent 长期记忆的用法里，每轮对话会自动调一次 breath 并把结果注入
+> 上下文。而「用户主动去查」和「系统每轮自动召回」的区别**只存在于调用方**，
+> OB 侧看不出来——于是 `dont_surface` 在检索道上形同虚设。
+
+### 新增 / Added
+
+- **检索道新增调用意图 `mode`**（`breath_search` / `breath_advanced`，默认
+  `"manual"`）。
+  - `"manual"` = 我自己决定要查这件事，**行为与以往逐字一致**。
+  - `"automatic"` = 调用方每轮自动召回，此时额外尊重 `dont_surface` 与
+    `digested`。
+  - **为什么是意图而不是 `respect_dont_surface` 开关**：那个区别是一个*意图*，
+    而意图是稳定的，标记清单不是——每多一个标记就多一个布尔参数，最后攒成一堆
+    彼此无关的开关。声明意图，由 `SurfacePolicyVM` 决定各模式吃哪些标记；仓库里
+    本来就有 `SurfaceMode`，这是往既有结构里加一档，不是外挂一个 flag。
+  - **为什么 `automatic` 也吃 `digested`**：`digested` 自己的定义就是「从默认/
+    被动浮现及 dream 隐藏，但仍可通过**显式** query 找回」。每轮自动发起的召回
+    按定义不是显式 query。这是跟随该标记既有的定义，不是发明新策略。
+  - **不吃 `pinned` / `permanent` / `anchor` / `protected`**：那几个管的是核心
+    准则、坐标系与防衰减。把它们从 agent 的上下文里静默拿掉，方向正好反了。
+    被 `digested` 标记过的核心准则同样照常返回（沿用既有的 `_never_digested` 豁免）。
+  - 无 query 的浮现道本来就走 `spontaneous`、本来就尊重这两个标记，不受 `mode`
+    影响；`importance_min` 分支同理。catalog 与 feel 是定向通道，不受影响。
+  - 未知值（空串、拼错、`"auto"`）一律当 `manual`。默认必须是「今天的行为」，
+    一个拼错的意图不该悄悄放宽或收紧过滤。
+
+- **`with_ids=True` 在返回文本末尾追加一段机器可读的结果清单**（默认不追加）。
+
+  末尾追加的形状是 `=== ombre:result-ids ===` 一行，后面跟一个 ```json 围栏，
+  里面是：`{"schema":1,"mode":"automatic","bucket_ids":["..."],"count":3,
+  "omitted_by_policy":2}`。
+
+  - 调用方原先只能解析 `[bucket_id:...]` 这类**人类渲染里的标记**，渲染一改就
+    静默失效，而失效方向是「该藏的漏出来」。这个块换掉那条路：标记稳定、带
+    schema 版本号、由用例钉住；改它必须先让测试变红。
+  - `omitted_by_policy` 是被 `dont_surface`/`digested` 挡掉的条数。给它是为了让
+    「过滤有没有真的生效」可观测——静默为 0 和静默漏出来，在调用方眼里长得一样。
+  - **没有改返回类型**。实测 `-> str` 的工具今天已经有 `structuredContent`，但
+    内容是 `{"result": "<同一段渲染文本>"}`，没有信息量；要放进 `bucket_ids` 得
+    改成返回 `CallToolResult`，代价是 `outputSchema` 变成 `None`。本版选择不动
+    返回类型，把契约放在文本里的独立块中。
+
+### 内部 / Internal
+
+- 新增 17 个用例（`tests/test_breath_call_mode.py`）。重点钉三件容易退化的事：
+  `manual` 的输出与不传 `mode` **逐字相同**；`with_ids` 的块只追加在末尾、
+  不扰动原有渲染（`with_ids.startswith(plain)`）；核心准则/坐标系/受保护记忆在
+  `automatic` 下必须照常返回。
+
 ## 3.6.3
 
 ### 修复 / Fixed

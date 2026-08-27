@@ -86,6 +86,8 @@ async def dispatch(
     date_from: Optional[str] = "",
     date_to: Optional[str] = "",
     quotes: Optional[bool] = False,
+    mode: Optional[str] = "manual",
+    with_ids: Optional[bool] = False,
 ) -> str:
     # --- Null-safe coercion ---
     query = "" if query is None else str(query)
@@ -106,6 +108,8 @@ async def dispatch(
     date_from = "" if date_from is None else str(date_from)
     date_to = "" if date_to is None else str(date_to)
     quotes = parse_bool(quotes, default=False)
+    mode = "manual" if mode is None else str(mode)
+    with_ids = parse_bool(with_ids, default=False)
 
     query_err = check_query_size(query)
     if query_err:
@@ -217,4 +221,6 @@ async def dispatch(
         with_quotes=quotes,
         created_from=created_from,
         created_to=created_to,
+        mode=mode,
+        with_ids=with_ids,
     ), query))

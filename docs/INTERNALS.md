@@ -304,6 +304,40 @@ feel 桶自身：
 4. **浮现模式**（无 `query`；`breath()` 固定走这里）：pinned/显式 permanent 桶展示为「核心准则」+ 未解决桶按衰减分排序，**冷启动**（`activation_count==0 && importance>=8`）的桶最多 2 个插到最前；后续排序**有两条互斥路径**：当 `surfacing.sampling.enabled=true` 时走加权无放回采样（`top_k` / `sample_k` / `temperature` 控制；详见 §7.1），否则走原 Top-1 固定 + Top-2~20 随机洗牌；**再按 `surfacing.recent_slots`（默认 3）给近 7 天创建的桶补足预留位置**（3.6.0，见下）；按 `max_results` 硬截断。**排除 anchor 与 protected 桶**：anchor 是坐标系；protected 只防衰减，不进入核心准则、未解决、久未浮现或偶遇池。浮现**不调用** `touch()`。每条返回正文后附一行紧凑 `👣 Footprint`，只表达创建、补充、淡去、归档、恢复等有意义的变迁，不展示 touch/索引噪声。**末尾追加 `=== 久未浮现 ===` 段**：从久未激活的高重要度桶里随机抽 1～2 条，模拟「突然想起来」；3.6.0 起 **24 小时内新建的桶不进这个池**——`activation_count==0` 既可能是「很久没被想起」也可能是「还没来得及被想起」，判据本身分不出来，得靠年龄。3.6.0 起本模式也接 `date_from`/`date_to`（核心准则不受时间过滤影响：它们是准则，不是那段时间里发生的事）。
 5. **检索模式**（有 `query`；`breath_search()` 固定走这里）：每个 query 只生成一次查询向量，与 rapidfuzz/BM25 多维评分共同进入 `BucketManager.search()` → 过滤 `feel/plan/letter`，**pinned/permanent/protected 仍可被显式检索命中**：pinned/permanent 加 `📌 [核心准则]`，protected 加 `🛡️ [受保护记忆]` → 纯语义候选相似度 `>=0.65` 标 `[语义关联]`，且不能绕过 domain/tags/type 过滤 → **命中不 `touch()`**（3.6.0：检索与强化解耦，见 §2.1 数据流约束）。查询也会检索 archive；归档命中返回保留的 Markdown 原文与 Footprint，明确邀请模型判断是否值得再次回忆，并显示 `trace(bucket_id="...", restore=True)`。查询只发现、不自动恢复，也不 touch 归档桶。结果不足时保留设计上的自由联想，但 protected 不进入这一非命中随机通道。embedding 不可用时明确提示后继续关键词/BM25；桶一旦命中，返回层直接使用当前存储的完整 `content`，不调用 dehydrate、不剥除 wikilink、不截断或改写。**不过滤 anchor**（设计：主动检索时希望能找到坐标系桶）。catalog 同样保留 protected 并使用相同的受保护标记。
 
+#### 调用意图 `mode`（3.7.0）
+
+`breath_search` / `breath_advanced` 的 `mode` 声明**这次检索是谁发起的**，默认 `"manual"`（行为与 3.7.0 之前逐字一致）。
+
+| mode | 含义 | 额外尊重的标记 |
+|---|---|---|
+| `manual`（默认） | 模型自己决定要查这件事 | 无（仍只挡 tombstone/archived/deleted） |
+| `automatic` | 调用方每轮自动召回并注入上下文 | `dont_surface`、`digested` |
+
+**为什么是意图而不是 `respect_dont_surface` 布尔开关**：「用户主动去查」和「系统每轮自动召回」的区别只存在于调用方，OB 侧看不出来。那是一个*意图*，而意图是稳定的、标记清单不是——每多一个标记就多一个布尔参数，最后会攒成一堆彼此无关的开关。声明意图，由 `SurfacePolicyVM` 决定各模式吃哪些标记。
+
+**为什么 `automatic` 也吃 `digested`**：`digested` 自己的定义就是「从默认/被动浮现及 dream 隐藏，但仍可通过**显式** query 找回」。每轮自动发起的召回按定义不是显式 query，吃掉它是跟随该标记既有的定义，不是发明新策略。
+
+**不吃 `pinned` / `permanent` / `anchor` / `protected`**：那几个管的是核心准则、坐标系与防衰减，把它们从 agent 的上下文里静默拿掉方向正好反了。被 `digested` 标记过的核心准则同样照常返回（`_never_digested` 豁免）。
+
+作用范围只有检索道。无 query 的浮现道走 `spontaneous`、`importance_min` 走 `importance`，两者本来就尊重 `dont_surface`；catalog 与 feel 是定向通道，不受 `mode` 影响。未知值（空串、拼错）一律当 `manual`——默认必须是「今天的行为」，一个拼错的意图不该悄悄放宽或收紧过滤。
+
+#### `with_ids`：给机器读的结果清单（3.7.0）
+
+`with_ids=True` 时在返回文本**末尾**追加一段，默认不追加：
+
+```
+=== ombre:result-ids ===
+{"schema":1,"mode":"automatic","bucket_ids":["..."],"count":3,"omitted_by_policy":2}
+```
+
+（实际输出里那行 JSON 包在一个 json 代码围栏中；上面为了不嵌套围栏省掉了。）
+
+**这是一个契约，不是渲染的一部分。** 调用方原先只能解析 `[bucket_id:...]` 这类人类渲染里的标记，渲染一改就静默失效，而失效方向是「该藏的漏出来」。这个块标记稳定、带 `schema` 版本号、由 `tests/test_breath_call_mode.py` 钉住；改它必须先让测试变红。
+
+`omitted_by_policy` 是被 `dont_surface`/`digested` 挡掉的条数——给它是为了让「过滤有没有真的生效」可观测：静默为 0 和静默漏出来，在调用方眼里长得一样。
+
+> **为什么不用 `structuredContent`**：`-> str` 的工具今天已经有 `structuredContent`，但 FastMCP 把原始类型包成 `{"result": "<同一段渲染文本>"}`，没有信息量。要放进 `bucket_ids` 必须改成返回 `CallToolResult`（`content` 可保持逐字不变），代价是 `outputSchema` 从 `{"result": string}` 变成 `None`。3.7.0 选择不动返回类型，把契约放在文本里的独立块中。
+
 #### 检索的门：召回与排序目前没有分开（已知设计债）
 
 `BucketManager.search()` 里决定「一条桶进不进结果」的判定是：

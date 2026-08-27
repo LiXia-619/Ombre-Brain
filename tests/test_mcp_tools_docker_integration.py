@@ -63,7 +63,10 @@ EXPECTED_TOOL_ORDER = (
 
 EXPECTED_TOOL_PROPERTIES = {
     "breath": set(),
-    "breath_search": {"query", "domain", "max_results", "date_from", "date_to", "quotes"},
+    "breath_search": {
+        "query", "domain", "max_results", "date_from", "date_to", "quotes",
+        "mode", "with_ids",
+    },
     "breath_advanced": {
         "query",
         "max_tokens",
@@ -76,6 +79,8 @@ EXPECTED_TOOL_PROPERTIES = {
         "catalog",
         "date_from",
         "date_to",
+        "mode",
+        "with_ids",
     },
     "hold": {
         "content",

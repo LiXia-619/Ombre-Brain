@@ -322,6 +322,12 @@ class Dehydrator:
         self.model = dehy_cfg.get("model", _DEFAULT_MODEL)
         self.base_url = dehy_cfg.get("base_url", _DEFAULT_BASE_URL)
         self.max_tokens = dehy_cfg.get("max_tokens", _DEFAULT_MAX_TOKENS)
+        # 日记拆条单独一个预算，而且可配：thinking 模型的 max_completion_tokens
+        # 包含推理 token，长内容下多少算够跟具体模型强相关，写死一个数注定有人
+        # 撞上。撞上时的表现是「短内容正常、长内容一直失败」。
+        self.digest_max_tokens = int(
+            positive_float(dehy_cfg.get("digest_max_tokens"), _DIGEST_MAX_TOKENS)
+        )
         self.temperature = dehy_cfg.get("temperature", _DEFAULT_TEMPERATURE)
         self.timeout_seconds = positive_float(dehy_cfg.get("timeout_seconds"), _API_TIMEOUT_SECONDS)
         # api_format: "openai_compat" (default) | "gemini" | "anthropic"
@@ -545,7 +551,18 @@ class Dehydrator:
         )
         if not response.choices:
             return ""
-        return response.choices[0].message.content or ""
+        choice = response.choices[0]
+        # 供应商明说了「我是被 max_tokens 截断的」，这条信号原先被整个丢掉：
+        # 半截 JSON 一路走到「返回空结果」，日志里什么线索都没有。
+        # 真机上「短内容正常、长内容一直失败」查了两天，缺的就是这一行。
+        if getattr(choice, "finish_reason", "") == "length":
+            logger.warning(
+                "LLM output truncated by max_tokens / 输出被 max_tokens 截断："
+                "model=%s limit=%s。半截 JSON 会解析失败。",
+                self.model,
+                max_tokens if max_tokens is not None else self.max_tokens,
+            )
+        return choice.message.content or ""
 
     async def _chat_gemini(
         self,
@@ -1032,10 +1049,13 @@ class Dehydrator:
         # --- API digest (no local fallback) ---
         self._require_api()
         try:
-            result = await self._api_digest(content)
+            result, 诊断 = await self._api_digest_detailed(content)
             if result:
                 return result
-            raise RuntimeError("API 日记整理返回空结果")
+            # 原来这里一律报「API 日记整理返回空结果」。空返回和「给了东西但
+            # 解析不出来」是两种完全不同的毛病，塌缩成同一句话就查不下去了——
+            # 真机上「短内容正常、长内容一直失败」卡了两天，卡的就是这个。
+            raise RuntimeError(诊断)
         except RuntimeError:
             raise
         except Exception as e:
@@ -1049,7 +1069,15 @@ class Dehydrator:
         """
         Call LLM API for diary organization.
         调用 LLM API 执行日记整理。
+
+        失败一律返回空列表——这个契约不能变，调用方（含测试）按它写的。
+        想知道**为什么**空，用 `_api_digest_detailed`。
         """
+        items, _诊断 = await self._api_digest_detailed(content)
+        return items
+
+    async def _api_digest_detailed(self, content: str) -> tuple[list[dict], str]:
+        """同上，另外返回一句「空的话是为什么」，给 digest() 报错用。"""
         # 带行号喂进去：prompt 要它报 source_ranges，它就必须看得见行号。
         # 这样它**碰不到原文本身**——只能说「第几行」，原话由系统逐字去取。
         # 「LLM 禁止压缩原句」这条因此是结构性的，不靠它自觉。
@@ -1060,12 +1088,26 @@ class Dehydrator:
         raw = await self._chat(
             DIGEST_PROMPT + _perspective_rule(self.human),
             编号原文,
-            max_tokens=_DIGEST_MAX_TOKENS,
+            max_tokens=self.digest_max_tokens,
             temperature=_DIGEST_TEMPERATURE,
         )
         if not raw.strip():
-            return []
-        return self._parse_digest(raw)
+            # thinking 模型的 max_completion_tokens 是**包含推理 token** 的，
+            # 长输入下推理吃光预算就会返回空文本。
+            return [], (
+                f"模型没有返回任何内容（输入 {len(截断)} 字，max_tokens="
+                f"{self.digest_max_tokens}）。thinking 模型的预算含推理 token，"
+                "长内容下可能被推理吃光；可调大 dehydration.digest_max_tokens。"
+            )
+        items = self._parse_digest(raw)
+        if not items:
+            return [], (
+                f"模型返回了 {len(raw)} 字但解析不出条目（输入 {len(截断)} 字，"
+                f"max_tokens={self.digest_max_tokens}）。最常见的原因是输出被 "
+                "max_tokens 截断成半截 JSON——日志里紧邻的那条 warning 带原始输出"
+                "开头，看它是不是断在中间。"
+            )
+        return items, ""
 
     # ---------------------------------------------------------
     # Parse diary digest result with safety checks

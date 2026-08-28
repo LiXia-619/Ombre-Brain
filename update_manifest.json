@@ -32,7 +32,7 @@
     },
     {
       "path": "src/VERSION",
-      "sha256": "2e9fa1560d7dc408e42825c89133fcd37ffa3d2a7d3f911ab21ec6b21ad76cd8",
+      "sha256": "a5f3bf7c7d6bb4e38f65f6fd984cf5dabf7dee41e8990ea10e13b6eec5e38724",
       "size": 6
     },
     {
@@ -42,8 +42,8 @@
     },
     {
       "path": "src/bucket_manager.py",
-      "sha256": "36ead9eb9c53a2432f76e8e53979a8f9dfd4f6936cafa825b364c12c4ed1ad5b",
-      "size": 199898
+      "sha256": "26138488319a81cb50a507397cf6fd62ac6aca83efa132c20db145aeae82c6db",
+      "size": 200263
     },
     {
       "path": "src/decay_engine.py",
@@ -52,8 +52,8 @@
     },
     {
       "path": "src/dehydrator.py",
-      "sha256": "8824e9f2245b2f4d850dad7b3ea75e1c1435e7cc669a431aee2d29b5b524dffd",
-      "size": 57547
+      "sha256": "b31a233ce9bf4fa389d27691aa0fb539b0105cdf72495a4c57b3561e3a38cf66",
+      "size": 60312
     },
     {
       "path": "src/deletion_requests.py",
@@ -82,8 +82,8 @@
     },
     {
       "path": "src/migrate_engine.py",
-      "sha256": "04922f5ac6bb90d34eac3ea31a290ec001d5aca001e5cf042c039c148e9f8a09",
-      "size": 79951
+      "sha256": "e4e433d124eb783ead63ce753d326fb875f8b81731c9d3bb27c6f2242ed3895b",
+      "size": 79894
     },
     {
       "path": "src/migration_engine.py",
@@ -947,8 +947,8 @@
     },
     {
       "path": "src/tools/grow/core.py",
-      "sha256": "564e4fd3cd8d0a057b915ba7b3edf663325afa6787102598acac6b5cc3fb7871",
-      "size": 16598
+      "sha256": "c9e2f1b60ff4cdb967afb946e3e053be96f76cf5a5d5d4f7899f67f756c97865",
+      "size": 17081
     },
     {
       "path": "src/tools/grow/retry_guard.py",
@@ -1047,8 +1047,8 @@
     },
     {
       "path": "src/utils.py",
-      "sha256": "3cb42c974237db804564f8aefe0cd5c0dece4629322f80da05465b044d5a6a98",
-      "size": 50724
+      "sha256": "c62af41109f9eb5497f1b44fbfff59fb765c5c24a2ac867e8c0b4ce42888aebc",
+      "size": 52832
     },
     {
       "path": "src/web/__init__.py",
@@ -1172,5 +1172,5 @@
     }
   ],
   "rollout_strategy": "single-node",
-  "version": "3.9.2"
+  "version": "3.9.3"
 }

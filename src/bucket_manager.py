@@ -318,6 +318,7 @@ from utils import (
     normalize_memory_title,
     parse_bool,
     parse_iso_datetime,
+    publish_new_file,
 )
 from ombrebrain.storage.media_store import MediaStore
 from ombrebrain.retrieval.bucket_scoring import (
@@ -362,6 +363,11 @@ def _atomic_create_text(path: str, text: str) -> None:
     right behavior for updates but unsafe for creation races.  Build the full
     file beside the destination and publish it with a hard link: link creation
     is atomic and fails with ``FileExistsError`` instead of overwriting.
+
+    硬链接不是所有文件系统都支持（Termux/Android 的 FUSE 挂载、部分 NAS/SMB
+    卷）。``publish_new_file`` 在那种环境下退到 ``O_CREAT|O_EXCL``，仍然保住
+    「已存在就拒绝」这条——退成 ``os.replace`` 是不行的，那会把「创建」悄悄
+    变成「覆盖」。
     """
 
     target = os.path.abspath(path)
@@ -376,7 +382,7 @@ def _atomic_create_text(path: str, text: str) -> None:
             handle.write(text)
             handle.flush()
             os.fsync(handle.fileno())
-        os.link(temporary, target)
+        publish_new_file(temporary, target, text)
     finally:
         try:
             os.unlink(temporary)

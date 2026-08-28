@@ -76,9 +76,21 @@ from ombrebrain.you.store import (
 )
 
 try:
-    from utils import _win_long_path, now_iso, safe_path, sanitize_name  # type: ignore
+    from utils import (  # type: ignore
+        _win_long_path,
+        now_iso,
+        publish_new_file,
+        safe_path,
+        sanitize_name,
+    )
 except ImportError:  # pragma: no cover
-    from .utils import _win_long_path, now_iso, safe_path, sanitize_name  # type: ignore
+    from .utils import (  # type: ignore
+        _win_long_path,
+        now_iso,
+        publish_new_file,
+        safe_path,
+        sanitize_name,
+    )
 
 logger = logging.getLogger("ombre_brain.migrate")
 
@@ -1485,7 +1497,9 @@ class MigrateEngine:
             # Hard-linking a complete same-filesystem staging inode gives us
             # O_EXCL semantics on both POSIX and Windows; os.replace would
             # silently overwrite an unrelated file with the same filename.
-            os.link(temp_path_long, target_long)
+            # 硬链接不可用的文件系统（Termux/Android 的 FUSE、部分 NAS/SMB）走
+            # publish_new_file 里的 O_CREAT|O_EXCL 兜底，语义一样，不退化成覆盖。
+            publish_new_file(temp_path_long, target_long, rendered)
         finally:
             _safe_unlink(temp_path_long)
 

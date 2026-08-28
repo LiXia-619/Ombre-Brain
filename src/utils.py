@@ -1118,6 +1118,48 @@ def atomic_write_text(path: str | Path, text: str) -> None:
         raise
 
 
+def publish_new_file(temporary: str, target: str, text: str) -> None:
+    """把已经写好的 ``temporary`` 发布成 ``target``；目标已存在就抛 FileExistsError。
+
+    首选硬链接：`link(2)` 原子地要么创建目标名、要么失败，不会覆盖别人。
+    `os.replace` 做不到这一点——它会静默覆盖，那是「更新」的语义，不是「创建」。
+
+    **但有些文件系统压根不支持硬链接**：Termux/Android 的 FUSE 挂载、部分
+    NAS/SMB 卷。真机上 `hold` 就是这么炸的（[OB-E004]）。这时退回
+    `O_CREAT|O_EXCL`——它同样是原子的「要么占到这个名字、要么 FileExistsError」，
+    只是不需要硬链接。
+
+    退回时会重写一遍正文而不是直接 `os.replace(temporary, target)`：后者一旦在
+    另一个进程刚创建同名文件之后执行，就把人家的文件盖掉了，而这个函数的全部
+    意义就是不许发生这件事。代价是这条路上「写入」不再是一次原子发布，读者有
+    可能看到半截文件——在不支持硬链接的文件系统上，这是能保住 no-clobber 的
+    最好结果。
+
+    `ombrebrain/storage/source_store.py` 早就为同一个原因做了兜底（那边靠一个
+    旁路租约），这里补上另外两处一直漏掉的。
+    """
+    link = getattr(os, "link", None)
+    if link is not None:
+        try:
+            link(temporary, target)
+            return
+        except FileExistsError:
+            raise
+        except OSError:
+            # 不支持硬链接。不按 errno 挑：不同平台报 EPERM / ENOSYS /
+            # EOPNOTSUPP / EXDEV 都有，而下面这条路本身是安全的——真是别的毛病，
+            # 它会用更清楚的错误再失败一次。
+            pass
+
+    descriptor = os.open(
+        target, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644
+    )
+    with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(text)
+        handle.flush()
+        os.fsync(handle.fileno())
+
+
 def count_tokens_approx(text: str) -> int:
     """
     Rough token count estimate.

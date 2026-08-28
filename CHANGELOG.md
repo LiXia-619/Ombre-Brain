@@ -2,6 +2,37 @@
 
 本项目版本号见根目录 `VERSION` 文件，Docker 镜像 tag 与之对应（`p0luz/ombre-brain:<VERSION>`）。
 
+## 3.9.3
+
+> 两条真机反馈：长内容 grow 连续失败但看不到原因；termux 上 hold 直接报错。
+
+### 修复 / Fixed
+
+- **硬链接不可用的文件系统上 `hold` 直接失败**（termux / Android 的 FUSE 挂载、
+  部分 NAS/SMB 卷）。
+  - `_atomic_create_text` 用 `os.link` 是**有意的**：它原子地要么创建目标名、
+    要么抛 `FileExistsError`，不会覆盖别人。`os.replace` 没有这个性质。
+  - 所以用户自己打的补丁（`os.link` 不可用时退回 `os.replace`）能跑，但把
+    「已存在就失败」悄悄换成了「已存在就覆盖」——而这个函数存在的全部意义
+    就是不许发生后者。
+  - 正确的兜底是 `O_CREAT|O_EXCL`：同样原子、同样「已存在就 FileExistsError」，
+    只是不需要硬链接。抽成 `utils.publish_new_file`。
+  - `ombrebrain/storage/source_store.py` 早就为同一个原因做了兜底（那边靠旁路
+    租约），只是 `bucket_manager` 和 `migrate_engine` 一直漏着。这次补齐。
+- **grow 失败时服务端日志说不出原因。**
+  - `detail=hidden` 是**写死在格式串里的字面量**，从来没打算记录任何东西。
+    这一行让「长内容 grow 一直失败」卡了两天。改成 `safe_error_detail(e)`
+    ——那个函数正是为这件事写的（正文照给，先抹凭证）。返回给客户端的仍然是
+    `PublicToolError` 的固定文案，一个字没多给。
+  - **「模型没返回东西」和「返回了但解析不出来」不再塌缩成同一句话。** 前者
+    多半是 thinking 吃光了预算，后者多半是输出被截断成半截 JSON，该调的旋钮
+    不一样，报错也就必须不一样。
+  - **`finish_reason == "length"` 现在会打 warning。** 供应商明说了「我是被
+    max_tokens 截断的」，这条信号原先被整个丢掉。
+  - 日记拆条预算改为可配：`dehydration.digest_max_tokens`（默认仍是 8192）。
+    thinking 模型的 `max_completion_tokens` **包含推理 token**，多少算够跟具体
+    模型强相关，写死一个数注定有人撞上——症状正是「短内容正常、长内容一直失败」。
+
 ## 3.9.2
 
 ### 修复 / Fixed

@@ -4084,23 +4084,50 @@ class BucketManager:
         return merged[:MAX_QUOTES], len(merged) - MAX_QUOTES
 
     @staticmethod
-    def _sanitize_float_field(value, default: float) -> float:
-        """从任意格式提取 float（兼容 'V0.9'、'[我的视角:V0.3]'、0.9 等老格式）"""
-        if isinstance(value, (int, float)):
+    def _sanitize_float_field(value, default: float, field: str = "", source: str = "") -> float:
+        """从任意格式提取 float（兼容 'V0.9'、'[我的视角:V0.3]'、0.9 等老格式）。
+
+        越界会钳制到 [0,1]，**并且说出来**——importance 一直会报 OB-W001，而这几个
+        字段过去是静默的。手改过桶文件的人无从知道自己写的 valence=99 变成了 1.0，
+        而 Markdown 可手改正是这套存储的卖点。
+
+        唯一的调用方在 `_load_bucket`，且外面套着 `if field in metadata`：能走到
+        这里就说明这个键**写在文件里**。所以取不出数字时回退到默认值也要报——
+        那不是「没写」，是「写了但读不懂」。
+        """
+        def _report(detail: str) -> float:
+            if field:
+                _ob_push_warning("OB-W001", f"{detail}（{source or 'load'}）")
+            return default
+
+        def _clamped(numeric: float) -> float:
+            out = max(0.0, min(1.0, numeric))
+            if out != numeric and field:
+                _ob_push_warning(
+                    "OB-W001",
+                    f"{field}={numeric} 超出 [0,1]，已修正为 {out}（{source or 'load'}）",
+                )
+            return out
+
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
             numeric = float(value)
             if not math.isfinite(numeric):
-                return default
-            return max(0.0, min(1.0, numeric))
+                return _report(f"{field}={value!r} 不是有限数，回退为 {default}")
+            return _clamped(numeric)
+        if value is None:
+            # 上游 _normalize_metadata_value 把 inf/nan 归一成了 None——
+            # 到这里已经看不出原值，但「这个键坏了」这件事必须留下来。
+            return _report(f"{field} 不是有效数值，回退为 {default}")
         try:
             nums = re.findall(r'[-+]?\d*\.?\d+', str(value))
             if not nums:
-                return default
+                return _report(f"{field}={value!r} 里没有数字，回退为 {default}")
             numeric = float(nums[0])
             if not math.isfinite(numeric):
-                return default
-            return max(0.0, min(1.0, numeric))
+                return _report(f"{field}={value!r} 不是有限数，回退为 {default}")
+            return _clamped(numeric)
         except Exception:
-            return default
+            return _report(f"{field}={value!r} 无法解析为数值，回退为 {default}")
 
     _normalize_metadata_value = staticmethod(_mn._normalize_metadata_value)
 
@@ -4129,7 +4156,9 @@ class BucketManager:
                 ("weight", 0.5),
             ):
                 if field in metadata:
-                    metadata[field] = self._sanitize_float_field(metadata[field], default)
+                    metadata[field] = self._sanitize_float_field(
+                        metadata[field], default, field, f"load:{Path(file_path).name}"
+                    )
             # YAML is an external input boundary (manual files, migration ZIP,
             # GitHub restore).  Never let arbitrary scalar strings reach JSON
             # consumers that treat these fields as numbers.
@@ -4153,7 +4182,9 @@ class BucketManager:
             return {
                 "id": post.get("id", Path(file_path).stem),
                 "metadata": metadata,
-                "content": post.content,
+                # 手改过的文件可能带控制字符/bidi 覆写。写入路径处处 _sanitize_text，
+                # 读取路径过去是直接透传的——而「文件可以手改」正是这套存储的卖点。
+                "content": self._sanitize_text(post.content),
                 "path": file_path,
             }
         except Exception as e:

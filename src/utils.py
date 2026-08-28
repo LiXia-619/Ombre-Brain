@@ -627,6 +627,17 @@ def load_config(config_path: Optional[str] = None) -> dict:
         except Exception:
             pass
 
+    # 空白的 buckets_dir 会让下面的 join 落到当前工作目录：记忆库看起来是空的，
+    # 新记忆散进 cwd。环境变量那条路早就把空字符串当"未设置"了
+    # （见 _apply_env_override），config.yaml 里写 buckets_dir: "" 走的是另一条
+    # 路，一直没这条规矩。统一成同一个约定。
+    if not str(config.get("buckets_dir") or "").strip():
+        config["buckets_dir"] = defaults["buckets_dir"]
+        logging.getLogger(__name__).warning(
+            "buckets_dir 是空的，已退回默认值 %s（空值会让记忆散进当前工作目录）",
+            config["buckets_dir"],
+        )
+
     # 媒体必须和记忆一起落在持久卷；默认使用数据目录下独立的 _media。
     # OMBRE_MEDIA_DIR 仅在确实挂载了另一块持久盘时覆盖。
     media_dir = os.environ.get("OMBRE_MEDIA_DIR", "").strip()
@@ -1154,10 +1165,21 @@ def publish_new_file(temporary: str, target: str, text: str) -> None:
     descriptor = os.open(
         target, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644
     )
-    with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
-        handle.write(text)
-        handle.flush()
-        os.fsync(handle.fileno())
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+    except BaseException:
+        # 这条路上「创建」和「写完」不是同一步，中间炸了（盘满、配额、SMB 断连）
+        # 就会在真实路径上留下一个半截文件。它 frontmatter 解析得通、_load_bucket
+        # 读得出来，于是调用方收到「失败」，库里却多了一条被截断的记忆。
+        # O_EXCL 保证这个名字是我们刚占下的，删掉不会碰到别人的文件。
+        try:
+            os.unlink(target)
+        except OSError:
+            pass
+        raise
 
 
 def count_tokens_approx(text: str) -> int:

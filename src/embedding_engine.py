@@ -41,6 +41,7 @@ import logging
 import math
 import os
 import sqlite3
+import time
 from collections import OrderedDict
 from typing import Any
 
@@ -217,9 +218,17 @@ class APIEmbeddingEngine(BaseEmbeddingEngine):
         # 云端（Gemini / 硅基流动等）保持 trust_env=True，国内往往正需要代理才能到。
         _host = base_url or ""
         _is_local_host = any(h in _host for h in ("127.0.0.1", "localhost", "ombre-ollama", "[::1]"))
+        # timeout 必须显式传给 AsyncOpenAI，不能只设在 http_client 上：SDK 只在
+        # http_client.timeout **不等于** httpx 自己的默认值（Timeout(5.0)）时才采纳
+        # 它，否则换成自己的 Timeout(connect=5, read/write/pool=600)。于是把
+        # timeout_seconds 恰好配成 5 的人，读超时被悄悄放大到 600 秒——遇到「收下
+        # 请求但不回」的服务器（挂死的代理、黑洞中间设备）就是 600×3 次尝试，而 MCP
+        # 那头等着的是模型。dehydrator.py 的写法才是对的。
+        # http_client 仍要自己建，因为本地 ollama 需要 trust_env=False（见上）。
         self._client = AsyncOpenAI(
             api_key=api_key,
             base_url=base_url,
+            timeout=self.timeout_seconds,
             http_client=httpx.AsyncClient(timeout=self.timeout_seconds, trust_env=not _is_local_host),
         )
 
@@ -364,6 +373,18 @@ class GeminiNativeEmbeddingEngine(BaseEmbeddingEngine):
 # 门面：EmbeddingEngine — 对外保持原接口
 # ============================================================
 
+def _record_startup_e001(detail: str) -> None:
+    """向量库层面的 OB-E001。两个后端各自的 _record_e001 是静态方法，门面用不到。"""
+    try:
+        try:
+            from errors import record_error  # type: ignore
+        except ImportError:
+            from .errors import record_error  # type: ignore
+        record_error("OB-E001", detail)
+    except Exception:
+        logger.warning(f"[embedding] OB-E001 (record failed): {detail}")
+
+
 class EmbeddingEngine:
     """SQLite 存储 + 搜索 + 元数据校验，持有一颗 BaseEmbeddingEngine。"""
 
@@ -505,6 +526,36 @@ class EmbeddingEngine:
     # -------------------- SQLite 初始化 --------------------
 
     def _init_db(self) -> None:
+        """建表；库文件坏掉时先隔离再重建。
+
+        向量库是**派生索引**——真源是 Markdown，它随时能从 outbox/对账重建。
+        而这个方法在 `__init__` 里被调用，`__init__` 又在 server.py 模块顶层
+        执行：一个断电、被同步工具截断、或被杀软动过的 .db 会让
+        `sqlite3.DatabaseError` 一路穿到 import，OB 直接起不来——用户为了一个
+        缓存丢掉全部记忆的访问权。宁可把坏文件挪到一边留作取证，重建一个空的。
+        """
+        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        try:
+            self._create_tables()
+            return
+        except sqlite3.DatabaseError as exc:
+            if not os.path.exists(self.db_path):
+                raise
+            quarantined = f"{self.db_path}.corrupt-{time.strftime('%Y%m%d-%H%M%S')}"
+            # 挪不动就照实抛出来：可能正被别的进程握着，别把一个还在被写的库删了。
+            os.replace(self.db_path, quarantined)
+            for suffix in ("-wal", "-shm"):
+                try:
+                    os.unlink(self.db_path + suffix)
+                except OSError:
+                    pass
+            _record_startup_e001(
+                f"向量库损坏已隔离到 {os.path.basename(quarantined)}，"
+                f"已重建空库，向量会按需重新生成（{type(exc).__name__}: {exc}）"
+            )
+            self._create_tables()
+
+    def _create_tables(self) -> None:
         """建表。embeddings 主表 + embeddings_meta 元数据表（2.0.3 新增）。"""
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         conn = sqlite3.connect(self.db_path)

@@ -31,6 +31,7 @@ import json
 import asyncio
 import hashlib
 import sqlite3
+import time
 import weakref
 import logging
 from typing import Optional
@@ -366,10 +367,15 @@ class Dehydrator:
         # --- 初始化 OpenAI 兼容客户端（仅 openai_compat 格式使用）---
         self.client: Optional[AsyncOpenAI] = None
         if self.api_available and self.api_format == "openai_compat":
+            # max_retries=0：重试归 _chat 那个循环管（_RETRY_MAX_ATTEMPTS 次，
+            # 指数退避，每次都写日志）。SDK 默认还会自己悄悄重试 2 次，两层叠起来
+            # 就是 3×3=9 次尝试 —— 服务器「收下请求但不回」时，一次 dehydrate()
+            # 能占满 9×timeout（默认 60s，即九分钟），而调用方是等在 MCP 那头的模型。
             self.client = AsyncOpenAI(
                 api_key=self.api_key,
                 base_url=self.base_url,
                 timeout=self.timeout_seconds,
+                max_retries=0,
             )
 
         # --- SQLite dehydration cache ---
@@ -389,20 +395,55 @@ class Dehydrator:
         self._cache_finalizer()
 
     def _init_cache_db(self) -> sqlite3.Connection:
-        """Open (or create) the dehydration cache DB; return a persistent connection."""
+        """打开（或新建）脱水缓存库；库文件坏掉时先隔离再重建。
+
+        这个缓存里没有任何真源数据——摘要丢了下次重新脱水就是了。而它在
+        `__init__` 里打开，`__init__` 又在 server.py 模块顶层执行：一个被断电
+        截断、被同步工具动过的 .db 会让 `sqlite3.DatabaseError` 穿到 import，
+        OB 起不来。用户为了一份缓存丢掉全部记忆的访问权，这笔账不划算。
+        """
         os.makedirs(os.path.dirname(self.cache_db_path), exist_ok=True)
+        try:
+            return self._open_cache_db()
+        except sqlite3.DatabaseError as exc:
+            if not os.path.exists(self.cache_db_path):
+                raise
+            quarantined = (
+                f"{self.cache_db_path}.corrupt-{time.strftime('%Y%m%d-%H%M%S')}"
+            )
+            os.replace(self.cache_db_path, quarantined)
+            for suffix in ("-wal", "-shm"):
+                try:
+                    os.unlink(self.cache_db_path + suffix)
+                except OSError:
+                    pass
+            logger.warning(
+                "脱水缓存损坏已隔离到 %s，已重建空库（%s: %s）",
+                os.path.basename(quarantined),
+                type(exc).__name__,
+                exc,
+            )
+            return self._open_cache_db()
+
+    def _open_cache_db(self) -> sqlite3.Connection:
         # check_same_thread=False is safe here: asyncio runs on one thread and all
         # cache calls are synchronous helper methods called from that same thread.
         conn = sqlite3.connect(self.cache_db_path, check_same_thread=False)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS dehydration_cache (
-                content_hash TEXT PRIMARY KEY,
-                summary TEXT NOT NULL,
-                model TEXT NOT NULL,
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
-            )
-        """)
-        conn.commit()
+        try:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS dehydration_cache (
+                    content_hash TEXT PRIMARY KEY,
+                    summary TEXT NOT NULL,
+                    model TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                )
+            """)
+            conn.commit()
+        except BaseException:
+            # sqlite3.connect 是惰性的，真正读文件的是上面这句。它失败时连接仍然
+            # 握着文件句柄——Windows 上不先关掉，隔离那一步会拿到 WinError 32。
+            conn.close()
+            raise
         return conn
 
     def _content_key(self, content: str) -> str:

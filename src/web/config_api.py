@@ -671,6 +671,7 @@ def register(mcp) -> None:
                         api_key=sh.dehydrator.api_key,
                         base_url=sh.dehydrator.base_url,
                         timeout=sh.dehydrator.timeout_seconds,
+                        max_retries=0,  # 重试归 Dehydrator._chat 管，见 dehydrator.py
                     )
                 except Exception as exc:
                     _rollback_hot_runtime()
@@ -1326,6 +1327,7 @@ def register(mcp) -> None:
                         api_key=staged_api_key,
                         base_url=staged_base_url,
                         timeout=staged_timeout,
+                        max_retries=0,  # 重试归 Dehydrator._chat 管，见 dehydrator.py
                     )
 
                 staged_attrs = {

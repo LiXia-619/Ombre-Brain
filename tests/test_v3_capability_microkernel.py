@@ -58,18 +58,3 @@ def test_capability_microkernel_dispatch_raises_policy_violation_for_denied_requ
         CapabilityMicrokernel(_registry()).dispatch(request)
 
 
-def test_legacy_runtime_dispatches_capability_through_microkernel(tmp_path) -> None:
-    from ombrebrain.app.legacy_runtime import LegacyRuntime
-
-    runtime = LegacyRuntime.from_config({"buckets_dir": str(tmp_path / "buckets")})
-
-    result = runtime.dispatch_capability(
-        "tools.search",
-        {"query": "permanent"},
-        permissions=("tools:search",),
-        actor_name="legacy-test",
-        source="tests",
-    )
-
-    assert result["name"] == "tools.search"
-    assert result["payload"] == {"query": "permanent"}

@@ -26,7 +26,6 @@ from starlette.responses import Response
 
 from . import _shared as sh
 
-from ombrebrain.app.legacy_runtime import LegacyRuntime
 from ombrebrain.architecture import (
     ADRDocument,
     ADRRequirementsContract,
@@ -35,12 +34,10 @@ from ombrebrain.architecture import (
     CodeArtifactSpec,
     HighestDifficultyCodeStandards,
 )
-from ombrebrain.cluster.replication import ReplicationContract, ReplicationSegment, ReplicationTopology
 from ombrebrain.maintenance import (
     MigrationPhasePlan,
     MigrationPreservationContract,
     MigrationTraceRecord,
-    VNextPreflightReportBuilder,
 )
 from ombrebrain.observability import ObservabilityMetricBoundary
 from ombrebrain.policy import RedLineContract, RedLineFeatureSpec, SurfaceDecision
@@ -179,13 +176,6 @@ def _probe_writable_dir(path: str) -> tuple[bool, str]:
             pass
         except OSError:
             pass
-
-
-def _build_isolated_vnext_preflight(policy: Any) -> dict[str, Any]:
-    """在隔离目录执行 vNext 诊断，不在用户 vault 创建 WAL 状态。"""
-    with tempfile.TemporaryDirectory(prefix="ombre-diagnostics-vnext-") as root:
-        runtime = LegacyRuntime.from_config({"buckets_dir": root, "policy": policy})
-        return VNextPreflightReportBuilder(runtime).build()
 
 
 def _build_diagnostics_observability_metrics(checks: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -437,40 +427,6 @@ def _build_crash_recovery_diagnostics() -> dict[str, Any]:
     }
 
 
-def _build_replication_contract_diagnostics() -> dict[str, Any]:
-    contract = ReplicationContract.default()
-    decisions = [
-        {
-            "decision_name": "topology",
-            **contract.evaluate_topology(
-                ReplicationTopology(
-                    canonical_writers=("leader",),
-                    projection_readers=("reader-a", "reader-b"),
-                    encrypted_replicas=("reader-b",),
-                    segment_mode="snapshot_append_only",
-                )
-            ).to_dict(),
-        },
-        {
-            "decision_name": "segment",
-            **contract.evaluate_segment(
-                ReplicationSegment(
-                    replica_id="replica-a",
-                    events=[
-                        {"event_type": "TraceCreated", "trace_id": "t1", "trace_kind": "dynamic"},
-                        {"event_type": "TraceDeletedToArchive", "trace_id": "t1", "payload": {"tombstone": True}},
-                    ],
-                )
-            ).to_dict(),
-        },
-    ]
-    return {
-        "ok": all(decision.get("ok") for decision in decisions),
-        "decision_count": len(decisions),
-        "decisions": decisions,
-    }
-
-
 def _build_migration_preservation_diagnostics() -> dict[str, Any]:
     source = [
         MigrationTraceRecord(
@@ -551,82 +507,6 @@ def _build_surface_context_diagnostics() -> dict[str, Any]:
         "truncated": data.get("truncated", False),
         "items": data.get("items", []),
     }
-
-
-def _build_preflight_cli_diagnostics(repo_root: str) -> dict[str, Any]:
-    root = str(repo_root or "")
-    cli_path = os.path.join(root, "tools", "vnext_preflight.py")
-    diagnostics_path = os.path.join(root, "src", "web", "system.py")
-    required_files = (cli_path, diagnostics_path)
-    missing_files = [_rel_path(path, root) for path in required_files if not os.path.isfile(path)]
-
-    cli_text = _read_text_file(cli_path) if os.path.isfile(cli_path) else ""
-    diagnostics_text = _read_text_file(diagnostics_path) if os.path.isfile(diagnostics_path) else ""
-    required_cli_snippets = (
-        "def build_parser",
-        "--buckets-dir",
-        "--output",
-        "--coverage-only",
-        "LegacyRuntime.from_config",
-        "VNextPreflightReportBuilder(runtime).build()",
-    )
-    required_diagnostics_snippets = (
-        "vnext_preflight",
-        "VNextPreflightReportBuilder(runtime).build()",
-        "Run tools/vnext_preflight.py",
-    )
-    missing_cli_snippets = [snippet for snippet in required_cli_snippets if snippet not in cli_text]
-    missing_diagnostics_snippets = [
-        snippet for snippet in required_diagnostics_snippets if snippet not in diagnostics_text
-    ]
-    ok = not missing_files and not missing_cli_snippets and not missing_diagnostics_snippets
-    return {
-        "ok": ok,
-        "status": "ok" if ok else "error",
-        "cli_path": _rel_path(cli_path, root),
-        "diagnostics_path": _rel_path(diagnostics_path, root),
-        "missing_files": missing_files,
-        "missing_cli_snippets": missing_cli_snippets,
-        "missing_diagnostics_snippets": missing_diagnostics_snippets,
-    }
-
-
-def _build_preflight_report_self_diagnostics(vnext_preflight: dict[str, Any]) -> dict[str, Any]:
-    checks = vnext_preflight.get("checks") if isinstance(vnext_preflight.get("checks"), dict) else {}
-    self_check = checks.get("preflight_report_self") if isinstance(checks, dict) else None
-    if not isinstance(self_check, dict):
-        return {
-            "ok": False,
-            "status": "error",
-            "schema": vnext_preflight.get("schema", ""),
-            "missing_self_check": True,
-            "available_checks": sorted(str(name) for name in checks),
-        }
-
-    data = dict(self_check)
-    data["missing_self_check"] = False
-    data["top_level_schema"] = vnext_preflight.get("schema", "")
-    data["top_level_check_count"] = vnext_preflight.get("check_count", 0)
-    return data
-
-
-def _build_vnext_coverage_diagnostics(vnext_preflight: dict[str, Any]) -> dict[str, Any]:
-    checks = vnext_preflight.get("checks") if isinstance(vnext_preflight.get("checks"), dict) else {}
-    coverage = checks.get("vnext_coverage") if isinstance(checks, dict) else None
-    if not isinstance(coverage, dict):
-        return {
-            "ok": False,
-            "status": "error",
-            "schema": "",
-            "missing_coverage_check": True,
-            "available_checks": sorted(str(name) for name in checks),
-        }
-
-    data = dict(coverage)
-    data["missing_coverage_check"] = False
-    data["top_level_schema"] = vnext_preflight.get("schema", "")
-    data["top_level_check_count"] = vnext_preflight.get("check_count", 0)
-    return data
 
 
 def _read_text_file(path: str) -> str:
@@ -1048,29 +928,6 @@ async def build_system_diagnostics() -> dict[str, Any]:
         ))
 
     try:
-        replication_report = _build_replication_contract_diagnostics()
-        checks.append(_check(
-            "replication_contract",
-            "Replication Contract",
-            "ok" if replication_report.get("ok") else "error",
-            (
-                "Replication contract preserves single-writer trace/tombstone boundaries"
-                if replication_report.get("ok")
-                else "Replication contract violations found"
-            ),
-            details=replication_report,
-            action="" if replication_report.get("ok") else "Inspect replication contract decision violations",
-        ))
-    except Exception as e:
-        checks.append(_check(
-            "replication_contract",
-            "Replication Contract",
-            "warning",
-            f"Replication contract check could not run: {e}",
-            action="Inspect replication diagnostics contract inputs",
-        ))
-
-    try:
         migration_report = _build_migration_preservation_diagnostics()
         checks.append(_check(
             "migration_preservation",
@@ -1114,114 +971,6 @@ async def build_system_diagnostics() -> dict[str, Any]:
             "warning",
             f"Surface context check could not run: {e}",
             action="Inspect surface context diagnostics inputs",
-        ))
-
-    try:
-        preflight_cli_report = _build_preflight_cli_diagnostics(sh.repo_root)
-        checks.append(_check(
-            "preflight_cli_diagnostics",
-            "Preflight CLI",
-            "ok" if preflight_cli_report.get("ok") else "error",
-            (
-                "vNext preflight CLI and Dashboard hook are present"
-                if preflight_cli_report.get("ok")
-                else "vNext preflight CLI or Dashboard hook is incomplete"
-            ),
-            details=preflight_cli_report,
-            action="" if preflight_cli_report.get("ok") else "Inspect tools/vnext_preflight.py and src/web/system.py",
-        ))
-    except Exception as e:
-        checks.append(_check(
-            "preflight_cli_diagnostics",
-            "Preflight CLI",
-            "warning",
-            f"Preflight CLI diagnostics check could not run: {e}",
-            action="Inspect preflight CLI diagnostics inputs",
-        ))
-
-    try:
-        if buckets_dir:
-            vnext_preflight = await asyncio.to_thread(
-                _build_isolated_vnext_preflight,
-                cfg.get("policy", {}),
-            )
-            checks.append(_check(
-                "vnext_preflight",
-                "vNext Preflight",
-                "ok" if vnext_preflight.get("ok") else "error",
-                "vNext preflight contracts are healthy" if vnext_preflight.get("ok") else "vNext preflight found contract violations",
-                details=vnext_preflight,
-                action="" if vnext_preflight.get("ok") else "Run tools/vnext_preflight.py and inspect failed checks",
-            ))
-            preflight_self_report = _build_preflight_report_self_diagnostics(vnext_preflight)
-            checks.append(_check(
-                "preflight_report_self",
-                "Preflight Self",
-                "ok" if preflight_self_report.get("ok") else "error",
-                (
-                    "vNext preflight report includes required checks"
-                    if preflight_self_report.get("ok")
-                    else "vNext preflight report is missing required checks"
-                ),
-                details=preflight_self_report,
-                action="" if preflight_self_report.get("ok") else "Inspect VNextPreflightReportBuilder required checks",
-            ))
-            vnext_coverage_report = _build_vnext_coverage_diagnostics(vnext_preflight)
-            checks.append(_check(
-                "vnext_coverage",
-                "vNext Coverage",
-                "ok" if vnext_coverage_report.get("ok") else "error",
-                (
-                    "vNext local phase coverage matrix has no preflight gaps"
-                    if vnext_coverage_report.get("ok") and not vnext_coverage_report.get("preflight_gap_count")
-                    else "vNext local phase coverage matrix needs attention"
-                ),
-                details=vnext_coverage_report,
-                action="" if vnext_coverage_report.get("ok") else "Inspect vNext coverage matrix output",
-            ))
-        else:
-            checks.append(_check(
-                "vnext_preflight",
-                "vNext Preflight",
-                "warning",
-                "vNext preflight skipped because buckets_dir is not configured",
-                action="Configure buckets_dir / OMBRE_VAULT_DIR first",
-            ))
-            checks.append(_check(
-                "preflight_report_self",
-                "Preflight Self",
-                "warning",
-                "Preflight self-check skipped because vNext preflight did not run",
-                action="Configure buckets_dir / OMBRE_VAULT_DIR first",
-            ))
-            checks.append(_check(
-                "vnext_coverage",
-                "vNext Coverage",
-                "warning",
-                "vNext coverage skipped because vNext preflight did not run",
-                action="Configure buckets_dir / OMBRE_VAULT_DIR first",
-            ))
-    except Exception as e:
-        checks.append(_check(
-            "vnext_preflight",
-            "vNext Preflight",
-            "warning",
-            f"vNext preflight could not run: {e}",
-            action="Run tools/vnext_preflight.py locally and inspect the traceback",
-        ))
-        checks.append(_check(
-            "preflight_report_self",
-            "Preflight Self",
-            "warning",
-            f"Preflight self-check could not run because vNext preflight failed: {e}",
-            action="Run tools/vnext_preflight.py locally and inspect the traceback",
-        ))
-        checks.append(_check(
-            "vnext_coverage",
-            "vNext Coverage",
-            "warning",
-            f"vNext coverage could not run because vNext preflight failed: {e}",
-            action="Run tools/vnext_preflight.py locally and inspect the traceback",
         ))
 
     dehy = cfg.get("dehydration", {}) or {}

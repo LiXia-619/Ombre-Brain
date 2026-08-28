@@ -51,7 +51,7 @@ def test_every_line_stays_valid_json(error_log):
     error_log.write_text(raw[: int(len(raw) * 0.6)], encoding="utf-8", newline="")
     errors.record_error("OB-E004", "重启后")
 
-    lines = [l for l in error_log.read_text(encoding="utf-8").splitlines() if l.strip()]
+    lines = [line for line in error_log.read_text(encoding="utf-8").splitlines() if line.strip()]
     assert json.loads(lines[-1])["detail"] == "重启后"
 
 
@@ -61,4 +61,4 @@ def test_a_healthy_log_gains_no_blank_lines(error_log):
 
     text = error_log.read_text(encoding="utf-8")
     assert "\n\n" not in text
-    assert len([l for l in text.splitlines() if l.strip()]) == 4
+    assert len([line for line in text.splitlines() if line.strip()]) == 4

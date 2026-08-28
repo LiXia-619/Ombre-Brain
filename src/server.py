@@ -703,7 +703,7 @@ async def breath(
     tags: Optional[str] = "",
     catalog: Optional[bool] = False,
 ) -> str:
-    """无参数,睁眼看看自己记得什么:返回权重最高、未解决且未标记 digested 的记忆 + 置顶核心准则。digested 从默认/被动浮现及 dream 隐藏，仍可由 breath_search(query=...) 显式找回。0 参数是刻意设计——claude.ai 按需加载工具时会跳过参数复杂的工具,拆成 0 参数才能保证每次对话自动浮现,不用手动触发。要按关键词找记忆用 breath_search(query=...);要用 catalog/tags/importance_min/valence/arousal/max_tokens 等高级模式用 breath_advanced(...)。"""
+    """无参数,睁眼看看自己记得什么:返回权重最高、未解决且未标记 digested 的记忆 + 置顶核心准则。digested 从默认/被动浮现及 dream 隐藏，仍可由 breath_search(query=...) 显式找回。0 参数是刻意设计——claude.ai 按需加载工具时会跳过参数复杂的工具,拆成 0 参数才能保证每次对话自动浮现,不用手动触发。要按关键词找记忆用 breath_search(query=...);要用 catalog/tags/importance_min/valence/arousal/max_tokens 等高级模式用 breath_advanced(...)。domain=只在某个主题域里找(逗号分隔),max_results=最多返回几条——这两个 breath 也认,但 breath 的本意就是不带参数睁眼看看。"""
     return await _with_notice(
         _t_breath.dispatch(
             query=query, max_tokens=max_tokens, domain=domain,
@@ -834,7 +834,7 @@ async def hold(
     source_ranges: Optional[list] = None,
     quotes: Optional[list] = None,
 ) -> str:
-    """仅在对话中已明确决定“这段内容值得成为长期记忆”时调用；不要因普通聊天、猜测或工具名称联想而自行调用。content 逐字保存，绝不压缩。正文里凡是**别人**说的话（不是用户、也不是我自己），写成单独一行 `@名字：原话`——这样的行以后会被单独拆成一条带 speaker 的 JSON 返回，不会被读成用户说过的话；混在叙述里写「某某说……」拆不出来。用户和我自己的话照常直接写，不要加 `@`。title 可选；传入时是最终显式标题，优先于打标模型建议。domain 可选、逗号分隔；显式传入时优先于打标模型结果。系统自动补其余元数据，API 不可用时使用本地中性值继续保存。tags 逗号分隔，importance 1-10。pinned=True 标记为永久核心；feel=True 存为感受类记忆且 domain 固定为 feel。source_bucket 是正在消化的原始记忆桶 ID。source_content/source_ranges 是可选原文证据：由调用方自行决定是否提供；原文进入与 grow 共用的不可变原文层，不参与普通 breath。省略 source_ranges 时整份 source_content 默认属于当前 hold 事件；显式 ranges 使用 1-based 闭区间。why_remembered 与 meaning 是可选的第一人称记录原因。media 可传服务器可读路径或 data_base64+filename 列表项。quotes 是这一刻我决定要原样记住的那一两句话——不是记录对话，是说出口的当下就知道自己不想忘的那几句。传字符串列表，或 [{"text":"原话","speaker":"谁说的","at":"什么时候"}]。最多 3 句、每句 100 字；超了会被拒绝而不是截断，因为截断过的话已经不是原话。**默认状态是一句都不放**：3 句是上限不是配额，绝大多数记忆不需要引语，拿不准就别放。不要为了保住上下文把一段话切成几句塞进来，也不要挑「有信息量」的句子——那是在用引语存原文，而原文层正是因为这个原因被删掉的。只放那种漏掉会真的可惜的原话。它平时不出现在任何浮现里，只有以后我自己想知道当时到底怎么说的时候才拿得出来。"""
+    """仅在对话中已明确决定“这段内容值得成为长期记忆”时调用；不要因普通聊天、猜测或工具名称联想而自行调用。content 逐字保存，绝不压缩。正文里凡是**别人**说的话（不是用户、也不是我自己），写成单独一行 `@名字：原话`——这样的行以后会被单独拆成一条带 speaker 的 JSON 返回，不会被读成用户说过的话；混在叙述里写「某某说……」拆不出来。用户和我自己的话照常直接写，不要加 `@`。title 可选；传入时是最终显式标题，优先于打标模型建议。domain 可选、逗号分隔；显式传入时优先于打标模型结果。系统自动补其余元数据，API 不可用时使用本地中性值继续保存。tags 逗号分隔，importance 1-10。pinned=True 标记为永久核心；feel=True 存为感受类记忆且 domain 固定为 feel。source_bucket 是正在消化的原始记忆桶 ID。source_content/source_ranges 是可选原文证据：由调用方自行决定是否提供；原文进入与 grow 共用的不可变原文层，不参与普通 breath。省略 source_ranges 时整份 source_content 默认属于当前 hold 事件；显式 ranges 使用 1-based 闭区间。why_remembered 与 meaning 是可选的第一人称记录原因。media 可传服务器可读路径或 data_base64+filename 列表项。quotes 是这一刻我决定要原样记住的那一两句话——不是记录对话，是说出口的当下就知道自己不想忘的那几句。传字符串列表，或 [{"text":"原话","speaker":"谁说的","at":"什么时候"}]。最多 3 句、每句 100 字；超了会被拒绝而不是截断，因为截断过的话已经不是原话。**默认状态是一句都不放**：3 句是上限不是配额，绝大多数记忆不需要引语，拿不准就别放。不要为了保住上下文把一段话切成几句塞进来，也不要挑「有信息量」的句子——那是在用引语存原文，而原文层正是因为这个原因被删掉的。只放那种漏掉会真的可惜的原话。它平时不出现在任何浮现里，只有以后我自己想知道当时到底怎么说的时候才拿得出来。valence/arousal 可选，0~1：valence 是情绪色调(0 消极/0.5 中性/1 积极)，arousal 是情绪强度(0 平静/1 激动)。不传由系统分析；只在你觉得系统会判错时才自己给。"""
     return await _with_notice(
         _t_hold.dispatch(
             content=content, title=title, tags=tags, importance=importance,
@@ -874,6 +874,32 @@ async def grow(
             "content_len": len(content or ""), "items": len(items or []),
             "test_data": bool(test_data),
         },
+    )
+
+
+async def _decide_deletion_request(
+    bucket_id: str,
+    request_id: Optional[str],
+    decision: Optional[str],
+    ai_reason: Optional[str],
+) -> str:
+    """审批一条人类发起的删除请求。失败抛 ToolInputError，不返回字符串。
+
+    抛而不是返回，是因为「没审批成功」必须在 MCP 侧表现为 isError=True——
+    否则模型会当成审批通过继续往下走，而那条记忆的去留其实一个字都没变。
+    """
+    result = await deletion_requests.decide(
+        request_id or "",
+        decision or "",
+        ai_reason or "",
+        expected_bucket_id=bucket_id,
+    )
+    if not result.get("ok"):
+        raise ToolInputError(
+            f"删除请求审批失败：{result.get('error') or '未知原因'}"
+        )
+    return (
+        f"删除请求 {request_id} 已{result['decision']}；桶 {result['bucket_id']}。"
     )
 
 
@@ -959,17 +985,35 @@ async def trace(
     权重就会爬到最高，那不是记忆变重要，是我查得勤。所以强化改成读完之后针对
     **那一条**显式确认：这条确实要紧。整批候选不要一起强化，命中里绝大多数只是
     路过。与其他字段更新互斥，请单独调用。
+
+    元数据字段：domain=主题域(逗号分隔)，tags=标签(逗号分隔)，
+    valence/arousal=情绪色调与强度(0~1)。meaning_replace / media_replace 是整段替换，
+    对应的 meaning_append / media_append 是追加——替换会丢掉原有内容，拿不准用 append。
+
+    审批删除请求：deletion_request_id=人类发起的那条请求的 ID，deletion_decision=
+    "approve" 或 "reject"，deletion_ai_reason=你做这个决定的理由（可选）。
+    这是删除某条记忆前征求你意见的入口——人类提请求，你决定。与其他字段更新互斥，
+    请单独调用；审批不成立时会报错，不会静默当成通过。
     """
     if deletion_request_id or deletion_decision:
-        result = await deletion_requests.decide(
-            deletion_request_id or "",
-            deletion_decision or "",
-            deletion_ai_reason or "",
-            expected_bucket_id=bucket_id,
+        # 这条分支原先直接 return，绕过了 _with_notice 的全部五条职责，
+        # 其中最要紧的是失败没有变成 isError。
+        #
+        # 仓库自己写过为什么不行（test_mcp_tools_docker_integration.py）：
+        # 「用返回字符串表达失败，在客户端是一次正常返回，调用方（通常是模型
+        #  自己）会以为成功了继续往下走」。trace 的常规路径由
+        # test_trace_failure_is_error.py 守着这条规矩，而这半边一直没人守。
+        return await _with_notice(
+            _decide_deletion_request(
+                bucket_id, deletion_request_id, deletion_decision, deletion_ai_reason
+            ),
+            op="trace",
+            args={
+                "bucket_id": bucket_id,
+                "deletion_request_id": deletion_request_id,
+                "deletion_decision": deletion_decision,
+            },
         )
-        if not result.get("ok"):
-            return "Deletion request decision failed: " + str(result.get("error") or "unknown error")
-        return f"Deletion request {deletion_request_id} {result['decision']}; bucket {result['bucket_id']}."
     return await _with_notice(
         _t_trace.dispatch(
             bucket_id=bucket_id, name=name, title=title, domain=domain,
@@ -1207,7 +1251,7 @@ async def feel(
     query: str,
     max_tokens: Optional[int] = 0,
 ) -> str:
-    """按关键词找回我以前留下的感受。query 必填——feel 不是列表，是「我此刻在想的这件事，我以前怎么感受的」，先说在想什么才知道该翻哪一段。关键词走向量检索（候选限定在 feel 桶内，相似度 >= 0.65 才算命中），同一件事换个说法也能找回；向量不可用时退回关键词字面匹配并明确提示降级。命中后逐字返回完整正文，不截断、不摘要、不调 LLM；不返回未命中的 feel，也不用低相关的凑数。写入感受仍用 hold(content=..., feel=True, source_bucket=...)。"""
+    """按关键词找回我以前留下的感受。query 必填——feel 不是列表，是「我此刻在想的这件事，我以前怎么感受的」，先说在想什么才知道该翻哪一段。关键词走向量检索（候选限定在 feel 桶内，相似度 >= 0.65 才算命中），同一件事换个说法也能找回；向量不可用时退回关键词字面匹配并明确提示降级。命中后逐字返回完整正文，不截断、不摘要、不调 LLM；不返回未命中的 feel，也不用低相关的凑数。写入感受仍用 hold(content=..., feel=True, source_bucket=...)。max_tokens=返回正文的 token 上限,默认够用,只在一次要看很多条时才调大。"""
     return await _with_notice(
         _t_breath.surface_feels(query=query, max_tokens=max_tokens or 10000),
         op="feel",

@@ -32,6 +32,7 @@ from typing import Optional
 from utils import parse_bool
 
 from .. import _runtime as rt
+from errors import ToolInputError
 from .._common import (
     check_metadata_size,
     check_query_size,
@@ -111,12 +112,15 @@ async def dispatch(
     mode = "manual" if mode is None else str(mode)
     with_ids = parse_bool(with_ids, default=False)
 
+    # 抛而不是 return：return 出去在 MCP 侧是 isError=False，模型会以为
+    # 「查过了，没结果」，然后据此得出「这件事没记过」——比报错糟得多。
+    # hold / anchor / trace 对同类失败一直是抛的，这里过去不是。
     query_err = check_query_size(query)
     if query_err:
-        return query_err
+        raise ToolInputError(query_err)
     metadata_err = check_metadata_size(domain=domain, tags=tags)
     if metadata_err:
-        return metadata_err
+        raise ToolInputError(metadata_err)
 
     # 3.6.0：日期区间在这里统一解析并校验一次，五条分支拿到同一对边界。
     # 此前只有 search 分支接了 date_from/date_to，`breath_advanced(date_to=...)`

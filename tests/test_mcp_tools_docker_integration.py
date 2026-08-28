@@ -910,8 +910,7 @@ def test_dream_clamps_window_to_documented_bounds(mcp_client, window_hours, expe
     ],
 )
 def test_query_tools_enforce_query_size_limit(mcp_client, tool, arguments):
-    result = mcp_client.call(tool, arguments)
-    assert "查询过大" in result
+    assert "查询过大" in _rejection_text(mcp_client, tool, arguments)
 
 
 @pytest.mark.parametrize(

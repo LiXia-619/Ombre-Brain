@@ -460,16 +460,17 @@ async def letter_read(
         date_from = ""
     if date_to is None:
         date_to = ""
+    # 同文件 218/225/301/310 行对同类失败是抛的，这里过去是 return。
     query_err = check_query_size(query)
     if query_err:
-        return query_err
+        raise ToolInputError(query_err)
     metadata_err = check_metadata_size(
         author=author,
         date_from=date_from,
         date_to=date_to,
     )
     if metadata_err:
-        return metadata_err
+        raise ToolInputError(metadata_err)
     try:
         limit = max(1, min(50, int(limit)))
     except (TypeError, ValueError, OverflowError):

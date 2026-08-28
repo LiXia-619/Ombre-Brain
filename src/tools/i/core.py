@@ -77,7 +77,7 @@ async def i_core(
         aspect=aspect, promote=promote, supersedes=supersedes
     )
     if metadata_err:
-        return metadata_err
+        raise ToolInputError(metadata_err)
 
     if rt.mark_op:
         rt.mark_op("I")

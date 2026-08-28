@@ -42,8 +42,8 @@
     },
     {
       "path": "src/bucket_manager.py",
-      "sha256": "26138488319a81cb50a507397cf6fd62ac6aca83efa132c20db145aeae82c6db",
-      "size": 200263
+      "sha256": "5a03fcff33822f03315a2131a7661fbbcbfb09a452826cb8712ce1ec5e641f05",
+      "size": 192669
     },
     {
       "path": "src/decay_engine.py",
@@ -454,6 +454,11 @@
       "path": "src/ombrebrain/storage/media_store.py",
       "sha256": "faa7bfa255d203d113ffffb645dc1c31f10fb1ae4ee8b5a7203eaad429a9c141",
       "size": 12715
+    },
+    {
+      "path": "src/ombrebrain/storage/metadata_normalize.py",
+      "sha256": "b78c7f28abdebe74aef83f7eb8bec9da54b2f4387a21f91bbd7a5a3d312fff02",
+      "size": 8201
     },
     {
       "path": "src/ombrebrain/storage/module_sqlite.py",

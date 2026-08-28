@@ -101,16 +101,6 @@
       "size": 581
     },
     {
-      "path": "src/ombrebrain/app/command_boundary_health.py",
-      "sha256": "45f0048f995f9ad05aec8533cba5fe21a4e2ecf9c418eca23f25680ab650e7f6",
-      "size": 3584
-    },
-    {
-      "path": "src/ombrebrain/app/command_bridge.py",
-      "sha256": "c282a479da96fed38f89bc8df1383717ac63551623e39577e2dc73f584679062",
-      "size": 1706
-    },
-    {
       "path": "src/ombrebrain/app/execution.py",
       "sha256": "37c0eb21df17d473af2117a8d8a5502f00037b185679eb8b6c211b185b7ade37",
       "size": 8854
@@ -157,38 +147,8 @@
     },
     {
       "path": "src/ombrebrain/architecture/defaults.py",
-      "sha256": "223b89d47680695ba8bddc61e977d943cdc35fe44b6ba532c61f3619e674e144",
-      "size": 3971
-    },
-    {
-      "path": "src/ombrebrain/capabilities/__init__.py",
-      "sha256": "cd3cd88d599af36ef055f202c9164543db2b35bff350c1a3a41a3c0585880254",
-      "size": 154
-    },
-    {
-      "path": "src/ombrebrain/capabilities/catalog.py",
-      "sha256": "f194ed4ca7eceba8ba4c13251e0315fccbb5e60f92d97d1c1b30fd4b0262e9be",
-      "size": 3160
-    },
-    {
-      "path": "src/ombrebrain/decision/__init__.py",
-      "sha256": "c9b67b2fc44c41b29a75300d05bba92ff3f505ca9ffa62df673dcfbfc4888b69",
-      "size": 342
-    },
-    {
-      "path": "src/ombrebrain/decision/ledger.py",
-      "sha256": "46cb81297cd409c8e9b6e8b11d5c6e7875fe3356b0de8890ce9879e13c868d1a",
-      "size": 1187
-    },
-    {
-      "path": "src/ombrebrain/decision/records.py",
-      "sha256": "4edd0d7537ca464fe226fb88d37a7999f6031c9adcc115479b47d736f271a52b",
-      "size": 9079
-    },
-    {
-      "path": "src/ombrebrain/decision/replay.py",
-      "sha256": "56aabf49cd2a98f3558037881a9bd2223eb61bd61d44dcd4e24b0be09130f69d",
-      "size": 4904
+      "sha256": "ef823f642f3c4af70757565ffa63ddd4d3cbbf1a66fa940f272c7d3de26cbe9f",
+      "size": 2277
     },
     {
       "path": "src/ombrebrain/domain/__init__.py",
@@ -222,13 +182,8 @@
     },
     {
       "path": "src/ombrebrain/eventsourcing/__init__.py",
-      "sha256": "49933aa2b1cc0654409977fe1096988e30e2a58a231ca07dbde18242c48cc07b",
-      "size": 289
-    },
-    {
-      "path": "src/ombrebrain/eventsourcing/contracts.py",
-      "sha256": "dd8270606555d3f2b511e4e60548340f0e31fd27558a5d46453cd8de7bab9064",
-      "size": 1784
+      "sha256": "adb4363453a458006ef8367af2e312ea85476790c84185b7fbcf5964027894ea",
+      "size": 37
     },
     {
       "path": "src/ombrebrain/eventsourcing/footprint.py",
@@ -236,19 +191,9 @@
       "size": 4597
     },
     {
-      "path": "src/ombrebrain/eventsourcing/kernel.py",
-      "sha256": "991eba77ee10dd6a0b3e903ac648fe7bc4c1b1d80d67946134610fdb9452db4e",
-      "size": 2023
-    },
-    {
       "path": "src/ombrebrain/eventsourcing/ledger_mirror.py",
       "sha256": "6708e950aed0f61b7e0da9e145f2917d80319cecf48801d9c19cbe00228c9f91",
       "size": 4567
-    },
-    {
-      "path": "src/ombrebrain/eventsourcing/ledger_property.py",
-      "sha256": "d13886b7b9d7bcba740c05f1a78f4fbe9a0887e4344ab0f5b662e8c68588a8e8",
-      "size": 4823
     },
     {
       "path": "src/ombrebrain/eventsourcing/ledger_replay.py",
@@ -301,21 +246,6 @@
       "size": 9970
     },
     {
-      "path": "src/ombrebrain/microkernel/__init__.py",
-      "sha256": "c97e9c97a0fd7930f7e488fc7fd488d540430601a9d26a576ac0b37eda383eb2",
-      "size": 264
-    },
-    {
-      "path": "src/ombrebrain/microkernel/contracts.py",
-      "sha256": "0d41603c52488461cf89c5ca8535b19a64c198b511b32b6a8c563b3d82fee1ef",
-      "size": 1479
-    },
-    {
-      "path": "src/ombrebrain/microkernel/runtime.py",
-      "sha256": "85317af60248c5a6a03806380e36f5652eeb00e03d7c71d898b9451a60a5e327",
-      "size": 1981
-    },
-    {
       "path": "src/ombrebrain/observability/__init__.py",
       "sha256": "3c2a39837a1f378a544f23b3d06044ee4db88e1f986c71af71817c02958c014e",
       "size": 336
@@ -324,21 +254,6 @@
       "path": "src/ombrebrain/observability/metrics.py",
       "sha256": "8d629ef914d23fa73a79d37eb5585500c118ceec958995a2816d103aac57d02b",
       "size": 6193
-    },
-    {
-      "path": "src/ombrebrain/plugins/__init__.py",
-      "sha256": "3a34446d84a5fe244f28b6453c5a8131d9ff600ad461323899b266fc1caa2384",
-      "size": 472
-    },
-    {
-      "path": "src/ombrebrain/plugins/contracts.py",
-      "sha256": "d887bae1efc3538cace59d34f02d96fdc1a4d1e1666d9da8a739e7efe21792a2",
-      "size": 8044
-    },
-    {
-      "path": "src/ombrebrain/plugins/runtime.py",
-      "sha256": "dedd58bec439852d52ef57350a4d1ababe97d58a5b8f75ab982bec3b15b51cd0",
-      "size": 7142
     },
     {
       "path": "src/ombrebrain/policy/__init__.py",

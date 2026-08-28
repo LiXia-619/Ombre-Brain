@@ -29,14 +29,6 @@ def default_architecture() -> ComponentGraph:
                 critical=True,
             ),
             ComponentDescriptor(
-                name="app.command_bridge",
-                layer="app",
-                side_effect_mode=SideEffectMode.AUDIT_ONLY,
-                dependencies=("domain.commands", "app.execution"),
-                owns_surfaces=("legacy_command_mapping",),
-                critical=True,
-            ),
-            ComponentDescriptor(
                 name="projection.audit_runtime",
                 layer="projection",
                 side_effect_mode=SideEffectMode.AUDIT_ONLY,
@@ -53,25 +45,9 @@ def default_architecture() -> ComponentGraph:
                 critical=True,
             ),
             ComponentDescriptor(
-                name="decision.ledger",
-                layer="decision",
-                side_effect_mode=SideEffectMode.AUDIT_ONLY,
-                dependencies=("projection.audit_runtime", "policy.engine"),
-                owns_surfaces=("decision_record",),
-                critical=True,
-            ),
-            ComponentDescriptor(
                 name="acceptance.harness",
                 layer="acceptance",
                 side_effect_mode=SideEffectMode.READ_ONLY,
-                critical=True,
-            ),
-            ComponentDescriptor(
-                name="eventsourcing.kernel",
-                layer="eventsourcing",
-                side_effect_mode=SideEffectMode.AUDIT_ONLY,
-                dependencies=("domain.commands", "protocol.schemas"),
-                owns_surfaces=("event_sourced_metadata",),
                 critical=True,
             ),
             ComponentDescriptor(
@@ -79,22 +55,6 @@ def default_architecture() -> ComponentGraph:
                 layer="retrieval",
                 side_effect_mode=SideEffectMode.READ_ONLY,
                 dependencies=("domain.commands",),
-                critical=True,
-            ),
-            ComponentDescriptor(
-                name="microkernel.runtime",
-                layer="microkernel",
-                side_effect_mode=SideEffectMode.AUDIT_ONLY,
-                dependencies=("policy.engine",),
-                owns_surfaces=("capability_microkernel_decision",),
-                critical=True,
-            ),
-            ComponentDescriptor(
-                name="plugins.runtime",
-                layer="plugins",
-                side_effect_mode=SideEffectMode.AUDIT_ONLY,
-                dependencies=("microkernel.runtime",),
-                owns_surfaces=("plugin_sandbox_decision",),
                 critical=True,
             ),
         )

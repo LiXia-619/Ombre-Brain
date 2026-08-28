@@ -2,6 +2,32 @@
 
 本项目版本号见根目录 `VERSION` 文件，Docker 镜像 tag 与之对应（`p0luz/ombre-brain:<VERSION>`）。
 
+## 3.9.2
+
+### 修复 / Fixed
+
+- **WAL 的跨进程锁在拿锁之前往锁文件里写字节，而写的位置正是要锁的位置。**
+  - `_exclusive_file_lock` 原先先把锁文件撑到 1 字节（seek 到末尾、为 0 就写一个）
+    再去锁 byte 0。另一个进程已经持锁时，这次 `write`/`flush` 撞在锁上抛
+    `PermissionError: [Errno 13]`——而且发生在**拿锁之前**，整个调用直接崩掉，
+    不是等锁。
+  - **那个字节根本不需要。** 实测：Windows 允许锁 EOF 之外的区域，0 字节文件上
+    锁 byte 0 既能成功、也能真正互斥（第二个 handle 拿不到，放锁后又能拿到）。
+    直接删掉那次写入，竞态的唯一来源就没了。
+  - 窗口很窄，只在重负载下偶发；`test_wal_concurrent_processes_...` 就是它的
+    受害者。
+- **子进程崩溃会拖垮整场测试（测试基建）。**
+  - Windows 上子进程按控制台代码页（GBK）写 stderr，用户名或路径里有中文就会
+    产生 UTF-8 解不开的字节。pytest 的捕获层按 UTF-8 解，那个
+    `IncrementalDecoder` 卡住之后**还会被继续复用**——此后每个测试的 setup 和
+    teardown 各报一次 error。
+  - 实测抓到的那一次：`1 failed, 332 passed, 97 skipped, 4911 errors`。
+    4911 = 之后 2455 个测试 × 每个两条。这就是困扰了很久的那个「偶发大规模
+    error」的完整解释：一条 WAL 竞态失败，加上一个把它放大成全场灾难的编码坑。
+  - conftest 里 `PYTHONIOENCODING=utf-8`（setdefault，外面显式配了就听外面的）。
+    子进程崩溃从此只是一条失败，不是一场灾难。
+  - 这也解释了为什么 CI 一直是绿的：Linux + 全 ASCII 路径，两个条件都不成立。
+
 ## 3.9.1
 
 ### 修复 / Fixed

@@ -32,7 +32,7 @@
     },
     {
       "path": "src/VERSION",
-      "sha256": "b43b810226c9625fdb0d7aad91c019a8423b40c4a3d7a80562c3725ee7df7919",
+      "sha256": "2e9fa1560d7dc408e42825c89133fcd37ffa3d2a7d3f911ab21ec6b21ad76cd8",
       "size": 6
     },
     {
@@ -417,8 +417,8 @@
     },
     {
       "path": "src/ombrebrain/fabric/log/wal.py",
-      "sha256": "475a84d21663da00dae3db727bccc7e4ce3473b420cd7a5a771354c214e397e2",
-      "size": 6591
+      "sha256": "87ead9de5bdeb4e72ffc95bc60ed2930a328e24163a3bbbf65af5cc07b65cddb",
+      "size": 7200
     },
     {
       "path": "src/ombrebrain/fabric/storage/__init__.py",
@@ -1172,5 +1172,5 @@
     }
   ],
   "rollout_strategy": "single-node",
-  "version": "3.9.1"
+  "version": "3.9.2"
 }

@@ -31,10 +31,16 @@ def _exclusive_file_lock(path: Path) -> Iterator[None]:
         if os.name == "nt":
             import msvcrt
 
-            handle.seek(0, os.SEEK_END)
-            if handle.tell() == 0:
-                handle.write(b"\0")
-                handle.flush()
+            # 不往锁文件里写任何东西。
+            #
+            # 原先这里先把文件撑到 1 字节（seek 到末尾、为 0 就写一个字节）再去锁
+            # byte 0。但**写的位置正是要锁的位置**：另一个进程已经持锁时，这次
+            # write/flush 撞在锁上抛 PermissionError: [Errno 13]，而且发生在拿锁
+            # 之前——整个调用直接崩掉，不是等锁。
+            #
+            # 那个字节根本不需要：Windows 允许锁 EOF 之外的区域，实测在 0 字节
+            # 文件上锁 byte 0 既能成功、也能真正互斥（第二个 handle 拿不到，
+            # 放锁后又能拿到）。窗口很窄，所以只在重负载下偶发。
             handle.seek(0)
             msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
             try:

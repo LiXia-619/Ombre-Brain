@@ -35,6 +35,19 @@ os.environ["OMBRE_BUCKETS_DIR"] = str(_TEST_BUCKETS)
 if not os.environ.get("OMBRE_EMBED_API_KEY"):
     os.environ["OMBRE_EMBED_API_KEY"] = "__test_dummy__"
 
+# 子进程崩溃不能把整场测试拖下水。
+#
+# Windows 上子进程的 traceback 按控制台代码页写 stderr（这台机器是 GBK）。
+# 用户名或路径里有中文，就会产生 UTF-8 解不开的字节；pytest 的捕获层按 UTF-8
+# 解，那个 IncrementalDecoder 一旦卡在这段字节上就再也解不出来，而它会被继续
+# 复用——**此后每个测试的 setup 和 teardown 各报一次 error**，整场剩下的测试
+# 全灭。实测抓到过一次：`1 failed, 332 passed, 97 skipped, 4911 errors`，
+# 4911 = 之后每个测试两条。
+#
+# 让子进程也说 UTF-8：崩溃就只是一条失败，而不是一场灾难。
+# 用 setdefault，外面显式配了就听外面的。
+os.environ.setdefault("PYTHONIOENCODING", "utf-8")
+
 # Ensure src/ is importable
 sys.path.insert(0, str(_REPO_ROOT / "src"))
 

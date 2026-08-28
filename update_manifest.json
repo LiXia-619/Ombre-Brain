@@ -222,8 +222,8 @@
     },
     {
       "path": "src/ombrebrain/kernel/errors.py",
-      "sha256": "9d5a4f681476d4895177540a65d9a97e82cd3ed53dfd1496d4d3e38f0d1d0230",
-      "size": 810
+      "sha256": "49a43a8a104b9756c2f22c97cbc2f47738fb43fd9d511fc671408d85f17524a5",
+      "size": 197
     },
     {
       "path": "src/ombrebrain/kernel/registry.py",
@@ -456,6 +456,11 @@
       "size": 12715
     },
     {
+      "path": "src/ombrebrain/storage/module_sqlite.py",
+      "sha256": "af9a322f2a1e074932ca5c72744f20f0a640cc4e81dd31065d2ed57b4ba018f8",
+      "size": 3274
+    },
+    {
       "path": "src/ombrebrain/storage/quote_store.py",
       "sha256": "e7e9f3a51a1ba12716961748829d73c2551ba6ff1b305979640118767df611a8",
       "size": 7046
@@ -497,8 +502,8 @@
     },
     {
       "path": "src/ombrebrain/them/store.py",
-      "sha256": "b199f8687ee8c07c4044867dd90bb6ba23de06cac1ffac9f5cbdd0d8dfb39dec",
-      "size": 22670
+      "sha256": "f52ab4971a6c4c99f1eefbfe55bff6063e8ab6392eb3b51ba35553cf6ab27f95",
+      "size": 21012
     },
     {
       "path": "src/ombrebrain/them/tool_gate.py",
@@ -532,8 +537,8 @@
     },
     {
       "path": "src/ombrebrain/you/store.py",
-      "sha256": "60d040629ecfc889964181570e5241b60e9e212632d4dbb4e0bc59f9e7e687a3",
-      "size": 20572
+      "sha256": "32ebfd9aa56593f1c2dad5cc27dbde0ced9367e7d2f1054795ea8d09e286e0ab",
+      "size": 18914
     },
     {
       "path": "src/ombrebrain/you/tool_gate.py",

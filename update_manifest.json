@@ -42,8 +42,8 @@
     },
     {
       "path": "src/bucket_manager.py",
-      "sha256": "5a03fcff33822f03315a2131a7661fbbcbfb09a452826cb8712ce1ec5e641f05",
-      "size": 192669
+      "sha256": "6ae50f9a22278ae0eb03a64b05d0e7af0050e353604cbe17d33f08aec7f57c82",
+      "size": 191659
     },
     {
       "path": "src/decay_engine.py",
@@ -441,6 +441,11 @@
       "size": 36522
     },
     {
+      "path": "src/ombrebrain/storage/bucket_paths.py",
+      "sha256": "b66085651fc7f0d43183148a9b28c7293096196878951d70aac4f6cb64cd995b",
+      "size": 2854
+    },
+    {
       "path": "src/ombrebrain/storage/embedding_outbox.py",
       "sha256": "71a41053d8cffd1f9105ad6972d3c6b3b1926ad1391b6e1ef7d10dea5494a90b",
       "size": 49079
@@ -577,8 +582,8 @@
     },
     {
       "path": "src/tools/_common.py",
-      "sha256": "54c814a78f35ce54aa8a74e855b2a1f714e3e485e7a48c0eb4dcc9a13db67633",
-      "size": 64006
+      "sha256": "24d69d6a6e51d82d0a75c49c4d0ede5835d798a8b9abfbbbe1b9a86884cf218e",
+      "size": 64024
     },
     {
       "path": "src/tools/_relation_link.py",
@@ -817,8 +822,8 @@
     },
     {
       "path": "src/web/github.py",
-      "sha256": "31d08372b7d6daf261653ef9cec820979bc18dcebe1cb265447893cc8a9b3a4f",
-      "size": 21392
+      "sha256": "204f8849359c812401cea5f670354e076e604fc6aeb5ebb3d3e6b71f49dfa2d5",
+      "size": 21391
     },
     {
       "path": "src/web/hooks.py",
@@ -867,8 +872,8 @@
     },
     {
       "path": "src/web/search.py",
-      "sha256": "7b11506878ce8a7a39048d95a5d8d55592e6569661677703c1ce151d2fb22513",
-      "size": 20996
+      "sha256": "3bea5dfa978447909c1db2b4ae748e9e89da423573e50fa524715dc36d35e0a7",
+      "size": 21115
     },
     {
       "path": "src/web/system.py",

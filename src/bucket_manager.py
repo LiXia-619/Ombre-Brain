@@ -320,6 +320,7 @@ from utils import (
     parse_iso_datetime,
     publish_new_file,
 )
+from ombrebrain.storage import bucket_paths as _bp
 from ombrebrain.storage import metadata_normalize as _mn
 from ombrebrain.storage.media_store import MediaStore
 from ombrebrain.retrieval.bucket_scoring import (
@@ -1848,11 +1849,16 @@ class BucketManager:
         os.makedirs(target_dir, exist_ok=True)
         return str(safe_path(target_dir, os.path.basename(file_path)))
 
-    @staticmethod
-    def _same_path(left: str, right: str) -> bool:
-        return os.path.normcase(os.path.abspath(left)) == os.path.normcase(
-            os.path.abspath(right)
-        )
+    # 这两个被 tools / web 依赖。私有名被跨模块调用是自相矛盾的信号：
+    # 要么不该被外部用，要么就该是公开接口。这里选后者，旧名保留不动，
+    # 免得动到本文件内几十处调用点。
+    def archived_letter_rejection(self, metadata: dict):
+        return self._archived_letter_rejection(metadata)
+
+    def invalidate_bm25(self) -> None:
+        self._invalidate_bm25()
+
+    _same_path = staticmethod(_bp.same_path)
 
     def _commit_bucket_update(
         self,
@@ -2938,18 +2944,7 @@ class BucketManager:
         )
         return result
 
-    @staticmethod
-    def _path_is_within(file_path: str, directory: str) -> bool:
-        """按解析后的绝对路径判断文件是否真实位于指定托管目录。"""
-        normalized_path = os.path.normcase(os.path.realpath(file_path))
-        normalized_directory = os.path.normcase(os.path.realpath(directory))
-        try:
-            return (
-                os.path.commonpath((normalized_path, normalized_directory))
-                == normalized_directory
-            )
-        except ValueError:
-            return False
+    _path_is_within = staticmethod(_bp.path_is_within)
 
     def _physical_bucket_sources(self, bucket_id: str) -> tuple[list[tuple[str, Any]], bool]:
         """绕过路径缓存，枚举同一 ID 的全部 Markdown 物理真源。
@@ -2976,27 +2971,9 @@ class BucketManager:
                 sources.append((file_path, post))
         return sources, unreadable_candidate
 
-    @staticmethod
-    def _has_strong_letter_marker(post: Any) -> bool:
-        """仅接受写信入口持久化的强来源标记，domain=letter 不足以授权。"""
-        if str(post.get("source_tool") or "").strip().casefold() == "letter":
-            return True
-        tags = post.get("tags") or []
-        if isinstance(tags, str):
-            tags = [part.strip() for part in tags.split(",")]
-        if not isinstance(tags, (list, tuple, set)):
-            return False
-        return any(str(tag).strip().casefold() == "__letter__" for tag in tags)
+    _has_strong_letter_marker = staticmethod(_bp.has_strong_letter_marker)
 
-    @staticmethod
-    def _has_ambiguous_letter_marker(post: Any) -> bool:
-        """识别仅有弱 Letter 线索的历史桶，供报告人工判断。"""
-        domains = post.get("domain") or []
-        if isinstance(domains, str):
-            domains = [domains]
-        if not isinstance(domains, (list, tuple, set)):
-            return False
-        return any(str(domain).strip().casefold() == "letter" for domain in domains)
+    _has_ambiguous_letter_marker = staticmethod(_bp.has_ambiguous_letter_marker)
 
     @staticmethod
     def _archived_letter_rejection(post: Any) -> str:

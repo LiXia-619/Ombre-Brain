@@ -856,6 +856,7 @@ docker compose -f deploy/docker-compose.yml up -d
 | 工具调用显示「执行报错」但记忆其实写进去了 | **不是服务器问题**：服务端已成功返回，是 Claude.ai 连接器/渲染层把一次成功往返显示成了报错 | 用 `letter_read` 或 Dashboard 确认数据已落盘；服务端日志 `phase=ok` 即表示成功 |
 | embedding API 暂时离线时 `breath(query=...)` 出现“检索降级” | OB 正在使用关键词/BM25 继续检索；命中桶仍逐字返回完整存储正文，不是记忆丢失 | 可继续使用；到系统诊断查看向量队列，恢复 API 后语义通道会自动回来 |
 | 向量化不生效 / 语义检索没结果（压缩却正常） | base_url 漏 `/v1`（→404）、model 漏 `BAAI/` 前缀（→Model does not exist），或后台队列因网络 / 配额持续重试 | 用 Dashboard 向量化区的「测试」和系统诊断查看待处理 / 重试数；按上面「用硅基流动…」一节填对 base_url 与 model；错误详情见设置页错误面板（OB-E001） |
+| 数据目录里冒出 `embeddings.db.corrupt-<时间戳>` 或 `dehydration_cache.db.corrupt-<时间戳>` | **记忆没丢**：这两个都是派生库（向量索引、摘要缓存），真源永远是 `.md`。它们启动时打不开（断电、同步工具截断、杀软动过）会被自动挪到一边并重建空库，服务照常启动 | 等后台把向量补齐（系统诊断里看队列），之后这些隔离文件可以直接删。**不要删 `.md`** |
 | 自有前端 / GPT / GLM 调用 MCP 工具被 401 卡住 | 默认强制 OAuth，自定义客户端不走该流程；或危险的非回环免鉴权配置已被安全门禁收紧 | 还要保留 Claude.ai 时选“OAuth + 静态 Token 共存”，否则可选纯静态 Token；仅同机连接才考虑回环免鉴权 |
 | **Operit / 安卓 / Proot 本地桥接一直黄灯、连不上 `/mcp`** | 多为下面三点之一：① `transport` 没设成 `streamable-http`（默认 `stdio` **根本不开 HTTP 服务**）；② 默认强制 OAuth，Operit 这类本地桥不走该流程被 401 卡半通；③ 客户端填了 `localhost`，在 Proot/Termux 里常解析成 IPv6 `::1`，连不上 IPv4 监听 | 见下方「**Operit / 安卓 / Proot 本地桥接**」一节，三步逐个对齐 |
 | Token 过期后无法自动重连 | 旧版本不支持 `refresh_token` grant，headless 环境只能重新打开授权页 | 更新到 v2.4.11+ 后重新授权一次，之后客户端可用 refresh token 自动续期 |

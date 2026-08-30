@@ -29,6 +29,7 @@
 11. Debug 快速索引（症状 → 文件 + 函数）
 12. 已知用户向反逻辑点
 13. 未来设想（依赖上游 hook 才能落地）
+14. 安全部署模式与首次向导
 
 ---
 
@@ -895,12 +896,6 @@ ledger 仍记录兼容事件 `TraceDeletedToArchive`，但 payload 会携带 tom
 
 这仍然不是 canonical runtime：Markdown 读写路径不变，replay validator 是“以后内核必须做到什么”的可执行契约。
 
-### 4.3.6 Ledger Property Runner（vNext Phase 5B，deterministic stress）
-
-`ledger_property.LedgerReplayPropertyRunner` 是 replay validator 的确定性随机压力层。它用 `random.Random(seed)` 生成合法 ledger 事件流，覆盖 create / update / touch / archive / tombstone-delete 生命周期，然后把每个 case 交给 `LedgerReplayValidator`。同一个 seed 必须生成完全相同的事件序列，方便复现失败。
-
-它不在 Dashboard 或常规诊断热路径里运行，只用于测试和人工本地校验。目标是给未来 Rust kernel / FFI 一套可复用 acceptance harness：Rust 版本接入后，也必须能通过同样的 replay/property cases。
-
 ### 4.3.7 Rust Replay Kernel（vNext Phase 6A，scaffold）
 
 `kernel/rust/ombre-kernel` 是 Rust kernel 的第一块脚手架。它目前是独立 Cargo crate，不接入 Python runtime、不参与 Dashboard、不替换 `LedgerReplayValidator`。crate 使用 std-only，无第三方依赖，定义 `LedgerEvent`、`ReplayReport`、`ReplayFailure`、`ViolationCode` 与 `ReplayKernel`，实现和 Python shadow validator 对齐的基础 replay 检查。
@@ -926,8 +921,6 @@ Decision summary 继续保留 `policy_allowed` 旧字段，同时新增 `policy_
 
 ### 4.3.9 Executable Policy Boundary（vNext Phase 7B，opt-in enforce）
 
-`LegacyRuntime.from_config()` 现在会读取 policy enforcement 配置：
-
 - 首选：`{"policy": {"enforcement_mode": "enforce"}}`
 - 兼容入口：`{"policy_enforcement_mode": "enforce"}`
 
@@ -941,39 +934,6 @@ Decision summary 继续保留 `policy_allowed` 旧字段，同时新增 `policy_
 4. 抛出 `PolicyViolation("policy denied ...")`。
 
 旧的 `ExecutionEnvelope.required_permissions` 仍是原有硬权限检查，和 v3 policy enforcement 分开。测试里刻意覆盖了“profile policy deny 但 required_permissions 为空”的路径，确保 Phase 7B 拦截的是新的 `effective_allowed`，不是旧权限机制。
-
-### 4.3.10 Plugin Capability Enforcement（vNext Phase 7C，opt-in enforce）
-
-`PluginRuntime` 现在有执行期 capability scope。插件注册期 sandbox 仍保持原规则：manifest 必须声明 capability，`write_legacy_state` 不能写 protected surfaces。Phase 7C 增加的是执行前检查：
-
-- 默认 `PluginRuntime.default()` 是 `audit`，缺权限只写入 `last_execution_decision()`，handler 仍执行。
-- 显式 `PluginRuntime.default(enforcement_mode="enforce")` 时，缺权限会在 handler 前抛 `PolicyViolation`。
-- `execute(..., permissions=(...), actor_name=..., source=...)` 会构造执行 scope，并复用 `CapabilityMicrokernel.authorize()`，不在 plugin runtime 里复制权限规则。
-
-已知 foundation capability 会检查真实权限。例如 `tools.breath` 需要 `tools:breath` 和 `memory:write`。未知的 plugin-local capability 仍按“manifest 已声明”处理，避免这一步误伤未来插件生态；等插件 capability registry 成型后，再把未知能力改成显式注册。
-
-`PluginExecutionDecision` 暴露 `allowed/effective_allowed/audit_only/missing_permissions/protected_surfaces`。这和 Phase 7B 的 legacy execution boundary 对齐：`allowed` 是原始策略判断，`effective_allowed` 是当前 enforcement mode 下是否真正放行。
-
-### 4.3.10.1 Plugin Agency Boundary（vNext Phase 11，registration-time）
-
-`PluginAgencyBoundary` 对应 vNext §20：插件可以扩展 infrastructure，但不能扩展 agency。它运行在 `PluginSandbox.evaluate()` 的最前面，早于 protected surface 检查和执行期 capability microkernel。
-
-允许的 `plugin_type` 包括 `projection`、`embedding_provider`、`vault_exporter`、`dashboard_panel`、`search_analyzer`、`migration_checker`、`decay_visualizer`、`integrity_auditor`。禁止的类型包括 `autonomous_goal`、`personality_engine`、`current_emotion_generator`、`belief_updater`、`answer_controller`、`user_scoring` 及其 `_plugin` 变体。
-
-`PluginManifest.from_dict()` 现在支持 vNext 风格 capability flags，例如：
-
-```python
-{
-    "type": "projection",
-    "capabilities": {
-        "read_surfaceable": True,
-        "issue_commands": False,
-        "set_current_emotion": False,
-    },
-}
-```
-
-布尔表里只有 true 项会进入 `manifest.capabilities`。如果插件声明 `issue_commands`、`set_current_emotion`、`create_autonomous_goal`、`belief_updater`、`answer_controller`、`user_scoring` 等 cognitive capability，注册期会返回 `PluginSandboxDecision(allowed=False, reason="forbidden cognitive capability")`，`PluginRuntime.register()` 会直接拒绝安装 handler。
 
 ### 4.3.10.2 Observability Metric Boundary（vNext Phase 12，diagnostic boundary）
 
@@ -1024,22 +984,6 @@ context_compiler
 ```
 
 `evaluate_recovery_plan()` 检查四条恢复原则：`ledger_wins`、`projections_rebuild`、`markdown_repaired`、`indexes_disposable`。如果计划把 Markdown、SQLite projection、vector index 等当成 canonical source，会返回 violation；恢复时必须是 ledger wins，projection/index 可以丢弃重建。
-
-### 4.3.10.4 Replication Contract（vNext Phase 14，shadow contract）
-
-`ombrebrain.cluster.replication.ReplicationContract` 对应 vNext §23。它不实现新的分布式共识，也不改变现有 Raft-style local cluster simulator；只验证集群/复制设计是否仍保留 OB 的记忆哲学边界。
-
-拓扑检查要求：
-
-- canonical ledger 必须是 single-writer。
-- projections 可以是 multi-reader。
-- replica 可以是 optional encrypted replica。
-- 复制模式应是 snapshot + append-only segment。
-- 如果声明 `full_distributed_consensus`，必须给出明确必要性，否则返回 `unnecessary_full_consensus`。
-
-segment 检查要求复制的是 trace / tombstone 事件，而不是 database-style `user_record`。如果某个 replica 收到 erased content removal（如 `TraceContentRemoved` / `ErasedContentRemoved`），同一复制段里必须同时带有该 trace 的 tombstone；否则返回 `content_removal_without_tombstone`。
-
-Phase 37 后，Dashboard `/api/system/diagnostics` 会追加 `replication_contract` 检查项：它运行一组只读 topology / segment 样例，把 single canonical writer、trace/tombstone replication 和非数据库化边界显示出来。这仍不启动真实集群、不读写用户 bucket，也不改变任何 GitHub sync 或 runtime 复制行为。
 
 ### 4.3.10.5 Migration Preservation Contract（vNext Phase 15，shadow contract）
 
@@ -1121,8 +1065,6 @@ Phase 34 后，Dashboard `/api/system/diagnostics` 会追加 `code_standards` �
 
 Phase 39 后，Dashboard `/api/system/diagnostics` 会追加 `surface_context` 检查项：它运行一组只读 allowed decision / memory payload 样例，确认旧记忆进入 context 后仍保持 `instructional_force="none"`、`may_control_reasoning=False`，并对 imperative wording 做 redaction。这不会接入 live `breath()` 或 `/api/search`，也不会读取真实 bucket。
 
-Phase 44 后，`LegacyRuntime` 会直接暴露 `compile_surface_context(decisions, memories, max_items=..., excerpt_chars=...)`。它调用 `SurfaceContextCompiler` 编译真实 surface decision / memory payload，并同时返回 `FormalInvariantChecker.evaluate_context_items()` 的报告。`VNextPreflightReportBuilder.surface_context` 复用这个 runtime API。这一步仍不改变 `breath()` / `/api/search` 的用户可见文本，但后续 live read path 可以通过 runtime 生成 non-instructional context，而不是绕开到 shadow compiler。
-
 ### 4.3.10.10 ADR Requirements Contract（vNext Phase 20，diagnostic）
 
 `ombrebrain.architecture.ADRRequirementsContract` 对应 vNext §30。它把“哪些变更必须写 ADR”和“ADR 必须回答哪些边界问题”拆成两个可测试入口：
@@ -1168,120 +1110,6 @@ Phase 33 后，Dashboard `/api/system/diagnostics` 会追加 `adr_requirements` 
 - `brain_language_implies_human_consciousness`
 
 `evaluate_feature(RedLineFeatureSpec)` 和 `evaluate_manifest(...)` 只做诊断，不扫描 PR，也不阻断 merge。Phase 35 后，Dashboard `/api/system/diagnostics` 会追加 `red_lines` 检查项：它把当前 diagnostics 暴露的几个 feature claims（系统诊断、ledger 诊断、公开工具 manifest、code standards、ADR requirements）交给 `RedLineContract.evaluate_manifest()`，确认这些功能描述没有踩到 17 条 vNext 红线。后续如果要接到 ADR/release checklist、GitHub Action 或 Dashboard 管理端 release preflight，应继续复用同一个 contract。
-
-### 4.3.10.12 vNext Preflight Report（Phase 22，local aggregate）
-
-`ombrebrain.maintenance.VNextPreflightReportBuilder` 把 Phase 16-21 的 shadow/contract 层聚合成一个本地 JSON-safe preflight：
-
-- `public_tools`：公开 MCP 工具命名契约。
-- `ledger_mirror`：append-only JSONL mirror 的 schema、hash、sequence 与 mirror/non-canonical 角色样例。
-- `trace_catalog_projection`：从 ledger mirror 重建内存 trace catalog shadow projection。
-- `sqlite_projection`：从 ledger mirror 重建 SQLite/FTS shadow projection 并验证检索样例。
-- `vector_projection`：读取 embeddings SQLite 的 shadow manifest，验证缺失/孤儿/坏向量统计路径。
-- `ledger_replay`：用 replay validator 验证 ledger sequence、body hash 和 projection lag。
-- `formal_invariants`：无静默抹除、projection 不改写真相、普通工具不能 total recall 等哲学不变量样例。
-- `context_serialization`：浮现记忆进入上下文前必须去指令化，并通过 formal invariant 检查。
-- `tool_output_humility`：公开工具输出必须保持 memory-humble，不成为命令、当前情绪或信念引擎。
-- `retrieval_scoring`：高相似度不能绕过 policy gate；排序使用 surface score，而不是裸 candidate score。
-- `code_standards`：高难度代码标准契约。
-- `command_boundary`：`command → policy → event → ledger → receipt` 证据链契约。
-- `runtime_command_boundary`：扫描最近 runtime fabric 事件里的真实 `command_boundary` receipt。
-- `observability_boundary`：只允许 memory health 指标，拒绝用户价值/操控类指标。
-- `crash_recovery`：写路径、读路径与恢复计划遵循 ledger-wins。
-- `replication_contract`：复制拓扑保持单 canonical writer、trace/tombstone 语义和非数据库化边界。
-- `migration_preservation`：迁移必须保留 trace kind、state、lineage、decay、tombstone 与 Python-first 阶段顺序。
-- `surface_context`：allowed surface decision 到 non-instructional context 的编译契约。
-- `adr_requirements`：ADR 标题与必答章节契约。
-- `red_lines`：17 条不能 merge 的能力红线。
-- `vnext_coverage`：列出本地 Phase 计划、测试文件与 preflight 覆盖映射，给出完成率和覆盖率。
-
-`V3MaintenanceReportBuilder.build()` 现在会附带 `vnext_preflight`，并把它计入顶层 `ok`。这一步仍不改变 Dashboard 路由，不自动扫描 PR，也不阻断 release；它只是把 vNext 架构边界从一堆分散测试收束成一个可以被 CLI、诊断页或 CI 后续调用的报告对象。
-
-Phase 41 后，Dashboard `/api/system/diagnostics` 会追加 `preflight_report_self` 检查项：它复用已经生成的 `vnext_preflight` 报告，提取其中的 `checks.preflight_report_self`，单独展示必需 check 是否齐全、是否有 malformed check。这不会重复执行 preflight，也不会让 self-check 变成 release gate。
-
-### 4.3.10.13 vNext Preflight CLI and Diagnostics（Phase 23）
-
-`tools/vnext_preflight.py` 现在可以直接生成本地 vNext preflight JSON：
-
-```powershell
-python tools/vnext_preflight.py --buckets-dir buckets
-python tools/vnext_preflight.py --buckets-dir buckets --output preflight.json
-python tools/vnext_preflight.py --buckets-dir buckets --coverage-only
-```
-
-Dashboard 系统诊断的 `build_system_diagnostics()` 也会追加一个 `vnext_preflight` 检查项。它使用当前 `buckets_dir` 创建 `LegacyRuntime`，调用 `VNextPreflightReportBuilder`，并把完整报告放在 check `details` 里。
-
-这一步仍不是 release gate：CLI 返回码会反映 preflight 是否通过，但不会自动提交、推送、阻断 GitHub Release 或改变任何 memory runtime 行为。诊断页里如果 preflight 自身运行失败，会降级成 warning，避免设置页因为诊断检查而打不开。
-
-Phase 40 后，Dashboard `/api/system/diagnostics` 会追加 `preflight_cli_diagnostics` 检查项：它只读扫描 `tools/vnext_preflight.py` 和 `src/web/system.py`，确认 `--buckets-dir`、`--output`、`--coverage-only`、`VNextPreflightReportBuilder` 调用以及 Dashboard hook 仍存在。这不会执行 CLI，也不会创建 preflight 输出文件。
-
-### 4.3.10.14 Runtime Command Boundary Evidence（Phase 24）
-
-`LegacyRuntime.record_execution_event()` 与 `record_tool_event()` 写入的事件会携带 `command_boundary.receipt` 和 `command_boundary.report`。`VNextPreflightReportBuilder` 的 `runtime_command_boundary` 会读取最近 fabric 事件，重新评估这些 receipt：
-
-- 有效 receipt：计入 `receipt_count`，并在 `reports` 中保留 contract 结果。
-- 旧事件只有 `command_plan`、没有 `command_boundary`：计入 `missing_receipts`，check 状态为 `warning`，但不让顶层 `ok=false`，避免老桶升级后被历史诊断事件卡住。
-- receipt 本身非法、缺失 receipt、或生成 metadata 时报错：计入 `issues`，check 状态为 `error`，并让 vNext preflight 返回失败。
-
-这仍是只读诊断：不会修复旧事件、不会改写 WAL、不会自动阻断 release。它的意义是把 Phase 18 的 command boundary 从“样例合同”推进到“真实运行证据”。
-
-Phase 43 后，`LegacyRuntime` 会直接暴露 `debug_command_boundary_health(limit=50)`。它扫描最近真实 fabric events，统计 candidate event、receipt、missing receipt、invalid receipt 和 issues；`VNextPreflightReportBuilder.runtime_command_boundary` 复用同一个 runtime API，而不是维护一份独立扫描逻辑。这仍不是 enforcement gate，但它把 command-boundary evidence 从 preflight 私有实现推进成 runtime 可查询能力。
-
-### 4.3.10.15 vNext Preflight Coverage Expansion（Phase 25）
-
-`VNextPreflightReportBuilder` 现在不只覆盖 Phase 16-24，也会纳入更早的重型 shadow contracts：formal invariants、context serialization、tool output humility、retrieval scoring、observability boundary、crash recovery、replication contract 与 migration preservation。
-
-这些 check 使用明确的安全样例，不扫描真实用户 bucket 内容，也不改变 runtime 行为。它们的作用是把分散在单元测试里的 vNext 架构边界收束到一个本地 preflight 出口中，方便 CLI、系统诊断页、后续 release checklist 或 CI 读取。
-
-### 4.3.10.16 vNext Coverage Matrix（Phase 26）
-
-`ombrebrain.maintenance.vnext_coverage.VNextCoverageMatrix` 是一个只读、本地的 Phase 映射表。它把目前的 vNext 本地实施阶段映射到：
-
-- 阶段标识与简短标题（内部计划文件不进入版本控制）；
-- 覆盖该阶段的测试文件；
-- 如果已经接入 preflight，则列出对应的 check name；
-- `local_completion_percent` 与 `preflight_coverage_percent`。
-
-`VNextPreflightReportBuilder` 会把它作为 `checks.vnext_coverage` 输出。这个 check 的 `ok=True` 表示“矩阵生成成功”，不等于架构已经最终完成；它只是把本地进度变成机器可读信息，方便回答“现在完成了多少”和“哪些阶段还没有 preflight 样例覆盖”。
-
-CLI 也支持 `tools/vnext_preflight.py --coverage-only`，只输出 `vnext-coverage.v1` 矩阵，适合在终端里快速查看完成率而不展开完整 preflight JSON。
-
-矩阵里的 `preflight_gaps` / `next_preflight_targets` 表示“已经有本地实现和测试，但还没有接入 preflight 样例检查”的阶段，不表示这些阶段失败。它们用于决定下一批应该补哪些 aggregate check。
-
-Phase 42 后，Dashboard `/api/system/diagnostics` 会追加 `vnext_coverage` 检查项：它复用已经生成的 `vnext_preflight` 报告，提取其中的 `checks.vnext_coverage`，单独展示 phase count、completion percent、preflight gap count 和 next targets。这不会重新计算矩阵，也不会把覆盖率数字解释成最终发布承诺。
-
-### 4.3.10.17 Early Core Preflight Samples（Phase 28）
-
-`VNextPreflightReportBuilder` 现在为早期核心阶段补了样例级 preflight 覆盖：
-
-- Phase 1：`ledger_mirror`
-- Phase 2A：`trace_catalog_projection`
-- Phase 2B：`sqlite_projection`
-- Phase 2C：`vector_projection`
-- Phase 5A：`ledger_replay`
-
-这些 check 会在临时目录里构造一小段安全样例 ledger 和 shadow projection，不读取真实 bucket 内容、不写用户 vault、不改 runtime 状态。它们的作用是把早期核心机制纳入 aggregate report，让 `vnext_coverage.next_preflight_targets` 能继续向后推进。
-
-### 4.3.10.18 Mid Core Preflight Samples（Phase 29）
-
-`VNextPreflightReportBuilder` 继续为中段高风险契约补样例级 preflight 覆盖：
-
-- Phase 5B：`ledger_property`
-- Phase 6A：`rust_kernel_scaffold`
-- Phase 7A：`policy_verdicts`
-- Phase 7C：`plugin_capability_enforcement`
-- Phase 22：`preflight_report_self`
-
-这些 check 仍然只使用固定 seed、内存样例或只读文件检查。`ledger_property` 用小样本确定性回放压力测试，`rust_kernel_scaffold` 只确认 Rust kernel scaffold 文件和导出的 replay contract 类型，不要求生产环境安装 Rust toolchain；`policy_verdicts` 和 `plugin_capability_enforcement` 验证 audit/enforce 两种 verdict 的语义边界；`preflight_report_self` 验证 aggregate report 自身没有漏掉必需 check。
-
-### 4.3.10.19 Preflight Gap Closure（Phase 30）
-
-`vnext_coverage.preflight_gaps` 现在可以在本地实施矩阵内清零。最后两项补充覆盖是：
-
-- Phase 23：`preflight_cli_diagnostics`，只读确认 `tools/vnext_preflight.py` 的 CLI 参数和 Dashboard diagnostics hook 仍然存在；
-- Phase 25：`preflight_coverage_expansion`，确认 Phase 8-15 相关 sample-driven checks 已经进入 aggregate preflight 且当前通过。
-
-这一步不把 preflight 变成 release gate，也不从 preflight 内部递归执行 CLI。CLI / diagnostics 的真实执行路径仍由 `tests/test_v3_maintenance_report.py` 和 `tests/test_system_diagnostics.py` 覆盖；aggregate preflight 只负责在本地报告里暴露“入口未丢失、覆盖语义完整”的结构化信号。
 
 ### 4.3.10.20 Diagnostics Observability Boundary（Phase 31）
 
@@ -1339,15 +1167,6 @@ Phase 42 后，Dashboard `/api/system/diagnostics` 会追加 `vnext_coverage` �
 
 这一步不执行真实 fsync、不修复 ledger、不重建 projection，也不改变 runtime 恢复策略；它只是把 vNext 的 crash-recovery 顺序约束暴露到 Dashboard diagnostics。
 
-### 4.3.10.26 Replication Contract Diagnostics（Phase 37）
-
-`web.system.build_system_diagnostics()` 现在会追加 `replication_contract` check。它通过 `ReplicationContract` 校验两类样例：
-
-- topology：single canonical writer, multi-reader projections, optional encrypted replica, snapshot append-only segment
-- segment：trace created + tombstone-preserving archive event
-
-这一步不启动真实 cluster、不复制用户数据、不连接网络，也不把 replication contract 变成 release gate；它只是把 vNext 的复制边界暴露到 Dashboard diagnostics，方便本地 preflight 和系统页面共同观察。
-
 ### 4.3.10.27 Migration Preservation Diagnostics（Phase 38）
 
 `web.system.build_system_diagnostics()` 现在会追加 `migration_preservation` check。它通过 `MigrationPreservationContract` 校验两类样例：
@@ -1367,44 +1186,6 @@ Phase 42 后，Dashboard `/api/system/diagnostics` 会追加 `vnext_coverage` �
 - 旧记忆里的 imperative wording 会被 redaction，而不是变成对当前 LLM 的命令
 
 这一步不调用真实 retrieval、不读取用户记忆、不改写搜索结果，也不把 surface context compiler 变成 runtime gate；它只是把 vNext 的“浮现以后仍不能替代思考”边界暴露到 Dashboard diagnostics。
-
-### 4.3.10.29 Preflight CLI Diagnostics（Phase 40）
-
-`web.system.build_system_diagnostics()` 现在会追加 `preflight_cli_diagnostics` check。它做的是源码级完整性检查：
-
-- `tools/vnext_preflight.py` 存在
-- CLI 保留 `build_parser()`、`--buckets-dir`、`--output`、`--coverage-only`
-- CLI 仍通过 `LegacyRuntime.from_config()` 和 `VNextPreflightReportBuilder(runtime).build()` 生成报告
-- `src/web/system.py` 仍保留 `vnext_preflight` Dashboard hook 和本地排查提示
-
-这一步不运行 CLI、不写 JSON 输出、不读取真实 bucket，也不把 preflight 变成自动 release gate；它只是让 Dashboard diagnostics 能在 aggregate `vnext_preflight` 之外，单独提示 CLI/诊断入口是否被误删。
-
-### 4.3.10.30 Preflight Report Self Diagnostics（Phase 41）
-
-`web.system.build_system_diagnostics()` 现在会追加 `preflight_report_self` check。它不重新构造 preflight，而是从同一次 `VNextPreflightReportBuilder(runtime).build()` 结果里提取 `checks.preflight_report_self`，并单独展示：
-
-- `schema`
-- `required_check_count`
-- `present_required_count`
-- `missing_required_checks`
-- `malformed_checks`
-- 顶层 `vnext_preflight` 的 schema / check count
-
-这一步不重复运行 CLI、不额外读取 bucket、不写输出文件，也不改变 `vnext_preflight` 顶层 OK 语义；它只是让 Dashboard diagnostics 能直接看到 aggregate report 自身是否完整。
-
-### 4.3.10.31 vNext Coverage Diagnostics（Phase 42）
-
-`web.system.build_system_diagnostics()` 现在会追加 `vnext_coverage` check。它不重新运行 coverage matrix，而是从同一次 `VNextPreflightReportBuilder(runtime).build()` 结果里提取 `checks.vnext_coverage`，并单独展示：
-
-- `schema`
-- `phase_count`
-- `local_completion_percent`
-- `preflight_coverage_percent`
-- `preflight_gap_count`
-- `next_preflight_targets`
-- 顶层 `vnext_preflight` 的 schema / check count
-
-这一步不扫描真实 bucket、不写输出文件、不改变 `vnext_preflight` 顶层 OK 语义；它只是让 Dashboard diagnostics 能直接回答“本地 vNext 阶段覆盖到了哪里”，并把 gap/next-target 信号从 aggregate report 里拿出来。
 
 ### 4.3.11 Formal Invariants Shadow Checker（vNext Phase 8A / Phase 10，diagnostic）
 
@@ -1455,9 +1236,7 @@ Phase 8B 仍没有改变 live `breath()` / search 输出。它先把“记忆只
 - `letter_write` / `letter_lock_update` / `letter_read` → `artifact_trace`。
 - `plan` → `unresolved_tension_memory`，并显式 `may_drive_action=False`。
 
-这一步和 `LegacyCommandBridge` 分工不同：command bridge 负责旧 runtime 的 command/projection plan；Neural Tool Router 负责表达“外部器官语言不变，内部路径严格分化”。Phase 8C 还没有替换 live tool execution。
-
-Phase 45 后，`LegacyRuntime` 会直接暴露 `neural_route(...)` / `route_neural_tool(...)`。它仍不调用 handler、不改变 MCP 工具名，但 runtime 现在可以为真实请求生成 organ tool → neural subsystem 的 route，并保留 actor/source/permissions scope。`VNextPreflightReportBuilder.tool_output_humility` 复用 runtime route，而不是直接构造 shadow router。
+它表达的是「外部器官语言不变，内部路径严格分化」。Phase 8C 还没有替换 live tool execution。
 
 ### 4.3.14 Tool Output Humility Contract（vNext Phase 8D，shadow contract）
 
@@ -1472,8 +1251,6 @@ Phase 45 后，`LegacyRuntime` 会直接暴露 `neural_route(...)` / `route_neur
 
 `evaluate_receipt()` 会把越界输出转成 `InvariantReport`：如果输出可以驱动行动、带命令力、声称当前情绪、把沉淀当信念引擎、或把重构当原始记忆，都会返回 violation。Phase 8D 仍是 shadow contract，不改变现有 MCP handler 的 live response；接入 live 输出需要后续逐个工具迁移和 token budget 评估。
 
-Phase 46 后，`LegacyRuntime` 会暴露 `tool_output_receipt(...)` / `evaluate_tool_output(...)`。它通过 runtime 的 neural route 生成 receipt，再用同一个 `ToolOutputContract` 评估 humility invariants。`VNextPreflightReportBuilder.tool_output_humility` 现在复用这个 runtime API，因此后续 live MCP handler 可以逐步接同一入口，而不是自己重建 route/receipt。
-
 ### 4.3.15 Policy-Gated Retrieval Scoring（vNext Phase 9，shadow contract）
 
 `ombrebrain.retrieval.scoring.PolicyGatedRetrievalScorer` 是 vNext §17 的高级检索评分契约。它把检索分成两层：
@@ -1484,8 +1261,6 @@ Phase 46 后，`LegacyRuntime` 会暴露 `tool_output_receipt(...)` / `evaluate_
 `SurfacePolicyVM` 的拒绝会强制把 `accessibility` 归零，所以高语义相似度、高 lexical 命中或高 graph 分都不能绕过 `dont_surface`、archive、tombstone、deleted 等 surface policy。`rank()` 也按最终 `surface_score` 排序，而不是按 raw candidate score 排序。
 
 Phase 9 仍是 shadow scoring contract：它没有替换 `src/tools/breath/search.py`、`src/tools/breath/surface.py` 或 Dashboard `/api/search` 的实际排序逻辑。后续接 live retrieval 时，应先把现有 decay/search/vector 分数映射到 `RetrievalFeatures`，再逐步打开 ranking，而不是直接重排所有用户可见结果。
-
-Phase 47 后，`LegacyRuntime` 会暴露 `score_retrieval_bucket(...)` / `rank_retrieval_candidates(...)`，并持有同一个 `PolicyGatedRetrievalScorer`。`VNextPreflightReportBuilder.retrieval_scoring` 复用 runtime scorer，证明 retrieval policy gate、surface score 与排名 contract 已经有 runtime 入口。真实 `breath` / search 仍需单独迁移 feature 映射与排序开关。
 
 ### 4.4 Dashboard 页面（侘寂风）
 
@@ -1817,6 +1592,13 @@ normalized = total / w_sum × 100   # 归一化到 0~100
 | `_check_plan_resolution` 无 embedding | — | 退回关键词/BM25 召回；未命中就不交给 LLM |
 | `decay_cycle` list_all 失败 | 异常 | 返回 `{checked:0, error:str}`，不终止后台循环 |
 | `decay_cycle` 单桶评分失败 | 异常 | WARNING 日志，跳过该桶 |
+| 向量库 `embeddings.db` 损坏 | `sqlite3.DatabaseError` | 隔离成 `embeddings.db.corrupt-<时间戳>` 后重建空库，记 OB-E001；向量按需重新生成。**不允许因为派生索引坏掉而拒绝启动** |
+| 脱水缓存 `dehydration_cache.db` 损坏 | `sqlite3.DatabaseError` | 同上，隔离成 `.corrupt-<时间戳>` 并重建；缓存里没有真源数据 |
+| 桶文件发布失败（无硬链接的文件系统） | 盘满 / 配额 / SMB 断连 | 删掉刚占下的半截目标文件再抛出；库里绝不留下能被 `_load_bucket` 读出来的截断记忆 |
+| `errors.jsonl` 尾行被崩溃截断 | — | 追加前先补换行，坏的只坏那一条；后续记录仍可读 |
+| embedding API 无响应 | 连接挂起 | 配置的 `timeout_seconds` 显式传给 SDK，封顶 timeout × 3 次尝试 |
+| 脱水 API 无响应 | 连接挂起 | 重试只在 `_chat` 一层（`_RETRY_MAX_ATTEMPTS` 次），SDK 侧 `max_retries=0`，封顶 timeout × 3 |
+| `buckets_dir` 配成空值 | — | 退回内置默认值并写 WARNING；不落到当前工作目录 |
 
 **核心设计决策（不要轻改）**：派生服务不能决定 Markdown 原文是否存在。`hold` 打标失败时使用明确标注的中性元数据保留原文；`breath` 只让检索/排序决定“想起哪段”，正文返回阶段逐字使用 Markdown 当前 content；需要 LLM 做结构化拆分的 `grow` 长内容仍可显式报错。所有检索降级都必须对调用方可见，不能伪装成完整语义结果。
 

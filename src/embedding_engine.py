@@ -54,6 +54,7 @@ try:
 except ImportError:  # pragma: no cover
     from .utils import parse_bool, positive_float  # type: ignore
 
+from ombrebrain.storage.vector_codec import decode_vector, encode_vector
 from ombrebrain.integrations.provider_detect import (
     is_known_cloud_embedding_endpoint,
     normalize_model_for_endpoint,
@@ -85,6 +86,11 @@ _QUERY_CACHE_MAXSIZE = 32
 # JSON strings, Python float objects and a second NumPy matrix at the same time.
 # Keep that peak independent of vault size (important on 512 MiB hosts).
 _SEARCH_BATCH_ROWS = 32
+
+# 启动时把老 JSON 向量改存成 BLOB 的一次性回填：每次启动最多花这么久，
+# 转不完下次接着转。别设太大——它挡在服务可用之前。
+_BACKFILL_BUDGET_SECONDS = 10.0
+_BACKFILL_CHUNK_ROWS = 200
 
 
 def _provider_input_identity(text: str) -> str:
@@ -537,6 +543,7 @@ class EmbeddingEngine:
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         try:
             self._create_tables()
+            self._backfill_json_vectors()
             return
         except sqlite3.DatabaseError as exc:
             if not os.path.exists(self.db_path):
@@ -554,6 +561,78 @@ class EmbeddingEngine:
                 f"已重建空库，向量会按需重新生成（{type(exc).__name__}: {exc}）"
             )
             self._create_tables()
+
+    def _backfill_json_vectors(self) -> None:
+        """把老的 JSON 向量就地改写成 float32 BLOB；带时间预算，可中断可续。
+
+        光改写入格式不够：存量库里每一行都还是 JSON，升级完检索照样是原来那么慢
+        （上游 issue #115 的报告人正是这种库）。这里不调 API、不改向量的含义，
+        只换存储格式，所以随时中断都安全。
+
+        跑在 `__init__` 里：这时后台 outbox worker 还没起来，没有并发写者。
+        超预算就停，下次启动接着转——判据就是「这一行还是不是 text」，天然可续。
+        """
+        deadline = time.monotonic() + _BACKFILL_BUDGET_SECONDS
+        converted = 0
+        after_rowid = 0
+        try:
+            conn = sqlite3.connect(self.db_path)
+        except sqlite3.Error:
+            return
+        try:
+            while time.monotonic() < deadline:
+                rows = conn.execute(
+                    "SELECT rowid, bucket_id, embedding, meaning_embedding"
+                    " FROM embeddings WHERE rowid > ?"
+                    " AND ((typeof(embedding) = 'text' AND length(embedding) > 2)"
+                    "   OR (typeof(meaning_embedding) = 'text'"
+                    "       AND length(meaning_embedding) > 2))"
+                    " ORDER BY rowid LIMIT ?",
+                    (after_rowid, _BACKFILL_CHUNK_ROWS),
+                ).fetchall()
+                if not rows:
+                    break
+                updates = []
+                for rowid, bucket_id, stored, meaning in rows:
+                    after_rowid = rowid
+                    try:
+                        pair = (
+                            self._as_blob(stored),
+                            self._as_blob(meaning),
+                        )
+                    except (ValueError, TypeError) as exc:
+                        # 坏行留着别动：这里的任务是换格式，不是替它决定要不要删。
+                        logger.warning(
+                            f"[embedding] backfill skipped {bucket_id!r}: "
+                            f"{type(exc).__name__}: {exc}"
+                        )
+                        continue
+                    updates.append((pair[0], pair[1], rowid))
+                if updates:
+                    conn.executemany(
+                        "UPDATE embeddings SET embedding = ?, meaning_embedding = ?"
+                        " WHERE rowid = ?",
+                        updates,
+                    )
+                    conn.commit()
+                    converted += len(updates)
+        except sqlite3.Error as exc:
+            logger.warning(f"[embedding] vector backfill stopped: {exc}")
+        finally:
+            conn.close()
+        if converted:
+            logger.info(
+                "[embedding] 已把 %d 条向量从 JSON 改存为 float32（检索会快很多）；"
+                "还没转完的下次启动继续",
+                converted,
+            )
+
+    @staticmethod
+    def _as_blob(value):
+        """把一格向量归一成 BLOB；空值原样返回，已经是 BLOB 的不动。"""
+        if value is None or value == "" or isinstance(value, (bytes, bytearray)):
+            return value
+        return encode_vector(decode_vector(value))
 
     def _create_tables(self) -> None:
         """建表。embeddings 主表 + embeddings_meta 元数据表（2.0.3 新增）。"""
@@ -734,7 +813,7 @@ class EmbeddingEngine:
                      embedding=excluded.embedding,
                      updated_at=excluded.updated_at,
                      content_hash=excluded.content_hash""",
-                (bucket_id, json.dumps(embedding), now_iso(), content_hash),
+                (bucket_id, encode_vector(embedding), now_iso(), content_hash),
             )
             conn.commit()
         finally:
@@ -770,7 +849,7 @@ class EmbeddingEngine:
                    VALUES (?, '', ?, '', ?)
                    ON CONFLICT(bucket_id) DO UPDATE SET
                      meaning_embedding=excluded.meaning_embedding""",
-                (bucket_id, now_iso(), json.dumps(embedding)),
+                (bucket_id, now_iso(), encode_vector(embedding)),
             )
             conn.commit()
         finally:
@@ -859,7 +938,7 @@ class EmbeddingEngine:
             conn.close()
         if row:
             try:
-                return json.loads(row[0])
+                return decode_vector(row[0]).tolist()
             except json.JSONDecodeError:
                 return None
         return None
@@ -912,7 +991,7 @@ class EmbeddingEngine:
 
                 bucket_ids: list[str] = []
                 best_scores: list[float | None] = []
-                candidate_vectors: list[list[float]] = []
+                candidate_vectors: list["np.ndarray"] = []
                 candidate_owners: list[int] = []
                 for bucket_id, emb_json, meaning_emb_json in rows:
                     # Access-sensitive callers (currently Letter) must remove
@@ -937,21 +1016,14 @@ class EmbeddingEngine:
                         if not raw_embedding:
                             continue
                         try:
-                            stored_embedding = json.loads(raw_embedding)
-                            if not isinstance(stored_embedding, list):
-                                raise TypeError(
-                                    f"embedding is {type(stored_embedding).__name__}, not list"
-                                )
-                            if not stored_embedding:
-                                continue
-                            stored_embedding = [float(value) for value in stored_embedding]
+                            stored_embedding = decode_vector(raw_embedding)
                         except (json.JSONDecodeError, ValueError, TypeError) as _emb_exc:
                             logger.warning(
                                 f"[embedding] Skipping malformed {label} for {bucket_id!r}: "
                                 f"{type(_emb_exc).__name__}: {_emb_exc}"
                             )
                             continue
-                        if len(stored_embedding) != query_dim:
+                        if stored_embedding.size != query_dim:
                             # Preserve the pairwise helper's existing contract:
                             # a dimension mismatch contributes a 0.0 score.
                             logger.warning(

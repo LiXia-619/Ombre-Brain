@@ -74,6 +74,7 @@ from ombrebrain.you.store import (
     validate_you_snapshot_bytes,
     validate_you_snapshot_file,
 )
+from ombrebrain.storage.vector_codec import decode_vector, encode_vector
 
 try:
     from utils import (  # type: ignore
@@ -1870,7 +1871,25 @@ class MigrateEngine:
         value_type: Any,
         declared_size: Any,
         expected_dimension: int,
-    ) -> str | None:
+    ) -> str | bytes | None:
+        # BLOB 那条路不经过 _normalize_embedding_text——那个函数是给文本用的，
+        # 会把二进制向量判成非法然后返回 None，于是整包记忆的向量在迁移时被
+        # 静默丢光（向量能重建，但用户会莫名其妙地要重新跑一遍全量向量化）。
+        if isinstance(value, (bytes, bytearray, memoryview)):
+            if len(bytes(value)) > _MAX_EMBEDDING_CELL_BYTES:
+                return None
+            try:
+                parsed = decode_vector(value).tolist()
+            except (ValueError, TypeError):
+                return None
+            if (
+                not parsed
+                or len(parsed) > _MAX_EMBEDDING_DIMENSIONS
+                or (expected_dimension and len(parsed) != expected_dimension)
+            ):
+                return None
+            return encode_vector(parsed)
+
         payload = cls._normalize_embedding_text(
             value,
             value_type,

@@ -62,8 +62,8 @@
     },
     {
       "path": "src/embedding_engine.py",
-      "sha256": "f92c0543602fec50e9366eda3e68ab43ee5fbd7a23a90ba13d108fec1c64d68a",
-      "size": 50737
+      "sha256": "245bd011ab211df24a9e8414848487a0c1c14a2730d704007e2f95890bb2b243",
+      "size": 52330
     },
     {
       "path": "src/errors.py",

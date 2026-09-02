@@ -391,6 +391,23 @@ def _record_startup_e001(detail: str) -> None:
         logger.warning(f"[embedding] OB-E001 (record failed): {detail}")
 
 
+def _header_safe(value: str) -> bool:
+    """这个值能不能原样放进 HTTP 请求头（头部只收 ASCII）。"""
+    try:
+        str(value).encode("ascii")
+        return True
+    except UnicodeEncodeError:
+        return False
+
+
+def _first_non_ascii(value: str) -> int:
+    """第一个非 ASCII 字符的位置，1-based，给人看的。"""
+    for index, char in enumerate(str(value), start=1):
+        if ord(char) > 127:
+            return index
+    return 0
+
+
 class EmbeddingEngine:
     """SQLite 存储 + 搜索 + 元数据校验，持有一颗 BaseEmbeddingEngine。"""
 
@@ -446,6 +463,22 @@ class EmbeddingEngine:
             # user-supplied Ollama URL. The real cloud key stays in config for
             # switching back, but the local runtime uses a non-secret token.
             api_key = "ollama"
+
+        if not _header_safe(api_key):
+            # key 里有非 ASCII 字符（多半是粘贴时混进了全角字符或中文）。
+            # 它会被塞进 `Authorization: Bearer <key>` 请求头，而 HTTP 头只收
+            # ASCII——于是每一次向量化都抛 UnicodeEncodeError，报错位置还落在
+            # "Bearer " 之后，看起来像是「中文内容不能向量化」（上游 #104 的
+            # 报告人就是这么误判的，去查了 LANG 和 locale）。
+            # 这种坏法重试一万次也不会好，所以按「没有 key」处理：进待机，
+            # 库照建，改对了热更新就激活——而不是让 outbox 永远重试下去。
+            _record_startup_e001(
+                f"embedding api_key 含非 ASCII 字符（第 {_first_non_ascii(api_key)} 位），"
+                "无法作为 HTTP 请求头发送；多为粘贴时混入全角字符。"
+                "已进入待机（向量化关闭），改正 key 后自动激活。"
+            )
+            self._init_db()
+            return
 
         if not api_key:
             # 无 key（仅云端后端会走到这）→ 待机模式：enabled=False，DB 仍初始化，key 热更新后激活

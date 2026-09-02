@@ -42,8 +42,8 @@
     },
     {
       "path": "src/bucket_manager.py",
-      "sha256": "528f5ebbd8de011dc3139d19f052a8bb1cb2b72b14c2b2c58249d6ac294df502",
-      "size": 193686
+      "sha256": "232554acf2345fd8a35f240a45ae36467d57fbe199e6556a9bae3bd8477c6d45",
+      "size": 192172
     },
     {
       "path": "src/decay_engine.py",
@@ -62,8 +62,8 @@
     },
     {
       "path": "src/embedding_engine.py",
-      "sha256": "245bd011ab211df24a9e8414848487a0c1c14a2730d704007e2f95890bb2b243",
-      "size": 52330
+      "sha256": "d95665d5594a648ed6d4d40e0cffe9754c21f00cff66ec759a78a98ba6547143",
+      "size": 52185
     },
     {
       "path": "src/errors.py",
@@ -102,8 +102,8 @@
     },
     {
       "path": "src/ombrebrain/app/execution.py",
-      "sha256": "37c0eb21df17d473af2117a8d8a5502f00037b185679eb8b6c211b185b7ade37",
-      "size": 8854
+      "sha256": "aa8c016e62831eb4f57be9a6db5550b5653b312a7f321503d87a88f2c1dca409",
+      "size": 2687
     },
     {
       "path": "src/ombrebrain/app/neural_router.py",
@@ -209,26 +209,6 @@
       "path": "src/ombrebrain/integrations/provider_detect.py",
       "sha256": "448ea66bb052b1946fd2562c0192b3cc75c1cd828e8482a6e1747384c0459643",
       "size": 4939
-    },
-    {
-      "path": "src/ombrebrain/kernel/__init__.py",
-      "sha256": "aa665508c41d01de5283e1458a3676adf5026039cb67c7bcf3996753840aa595",
-      "size": 167
-    },
-    {
-      "path": "src/ombrebrain/kernel/context.py",
-      "sha256": "dbdd27eb17d0e78e7a623e5d28e95b4378de6c50e57a6ea73bd33ad0e0f4a299",
-      "size": 2045
-    },
-    {
-      "path": "src/ombrebrain/kernel/errors.py",
-      "sha256": "49a43a8a104b9756c2f22c97cbc2f47738fb43fd9d511fc671408d85f17524a5",
-      "size": 197
-    },
-    {
-      "path": "src/ombrebrain/kernel/registry.py",
-      "sha256": "c13a47e3665438f46ce8008b1fa6e2d59ab89ac293dc62b128292cf4a883eda8",
-      "size": 2451
     },
     {
       "path": "src/ombrebrain/maintenance/__init__.py",
@@ -477,8 +457,8 @@
     },
     {
       "path": "src/ombrebrain/storage/relation_store.py",
-      "sha256": "a3b31e67340da8f9219adb925aac636a81d50f8dc3d1f164a2daf6cec9fd24d3",
-      "size": 12902
+      "sha256": "b8327824a13c81272dc22021a83632e298ebfaa93c71049fcb68db85a70eb062",
+      "size": 12785
     },
     {
       "path": "src/ombrebrain/storage/source_store.py",
@@ -882,8 +862,8 @@
     },
     {
       "path": "src/web/system.py",
-      "sha256": "e3a7d95ec251ea1e4f577dda34faf7a1528ad74d6a71d5b69d09ba8c2ffa9699",
-      "size": 56138
+      "sha256": "4bb703b425fc241ff1550ad1f137be70041b04e3f9d7666df80357a61da265a4",
+      "size": 55865
     },
     {
       "path": "src/web/them.py",

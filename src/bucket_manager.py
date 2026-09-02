@@ -2204,41 +2204,6 @@ class BucketManager:
             )
         return committed
 
-    async def mutate_source_links(self, bucket_id: str, mutation: Any) -> Any:
-        """Atomically change evidence bindings only, including archived buckets.
-
-        The callback receives the loaded frontmatter post and returns
-        ``(changed, result)``.  This deliberately bypasses normal update()
-        lifecycle/recency behaviour while retaining the per-bucket write turn.
-        """
-        async with self._bucket_turn(bucket_id):
-            file_path = self._find_bucket_file(bucket_id)
-            if not file_path:
-                return None
-            try:
-                post = frontmatter.load(file_path)
-            except Exception:
-                return None
-            changed, result = mutation(post)
-            if changed:
-                _atomic_write_text(file_path, frontmatter.dumps(post))
-            return result
-
-    async def mutate_relation_links(self, bucket_id: str, mutation: Any) -> Any:
-        """Atomically change one Relation ledger only; never touch derived state."""
-        async with self._bucket_turn(bucket_id):
-            file_path = self._find_bucket_file(bucket_id)
-            if not file_path:
-                return None
-            try:
-                post = frontmatter.load(file_path)
-            except Exception:
-                return None
-            changed, result = mutation(post)
-            if changed:
-                _atomic_write_text(file_path, frontmatter.dumps(post))
-            return result
-
     async def mutate_relation_pair(
         self,
         left_bucket_id: str,

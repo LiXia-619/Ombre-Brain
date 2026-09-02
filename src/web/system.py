@@ -509,18 +509,6 @@ def _build_surface_context_diagnostics() -> dict[str, Any]:
     }
 
 
-def _read_text_file(path: str) -> str:
-    with open(path, "r", encoding="utf-8") as f:
-        return f.read()
-
-
-def _rel_path(path: str, root: str) -> str:
-    try:
-        return os.path.relpath(path, root) if root else path
-    except ValueError:
-        return path
-
-
 def _read_persisted_runtime_config() -> tuple[str, dict[str, Any]]:
     """读取未应用环境覆盖的 config.yaml，供“已保存/实际生效”对照。"""
     path = config_file_path()

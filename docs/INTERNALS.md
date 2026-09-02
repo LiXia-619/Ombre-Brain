@@ -915,25 +915,11 @@ v3 `PolicyEngine` 现在区分两个结果：
 - `allowed`：Policy VM 的原始判断，表示契约上是否允许。
 - `effective_allowed`：当前 enforcement mode 下调用方应该是否真正放行。
 
-默认 `enforcement_mode="audit"`，因此 `audit_only=True`，即使 `allowed=False`，`effective_allowed` 也保持 True，用于延续旧的 legacy runtime 行为：记录风险，不阻断运行。显式创建 `PolicyEngine.default(enforcement_mode="enforce")` 时，`audit_only=False`，`effective_allowed` 跟随 `allowed`，给后续真正拦截 capability/plugin 调用留出稳定接口。
+默认 `enforcement_mode="audit"`，`audit_only=True`，即使 `allowed=False`，`effective_allowed` 也保持 True。
+
+**注意：`enforce` 目前没有下游。** 唯一读过 `effective_allowed` 去拦调用的是 `LegacyExecutionPipeline`，而它自己早已没有任何调用者，3.9.3 已删除。`PolicyEngine` 现在只被测试构造，生产路径不经过它，配置里也没有 `policy.enforcement_mode` 这一项。这套判断保留为契约与测试对象；真要接 enforcement，得先决定在哪一层拦。
 
 Decision summary 继续保留 `policy_allowed` 旧字段，同时新增 `policy_effective_allowed`。这避免把“策略判断”和“当前是否阻断”混成一个概念。
-
-### 4.3.9 Executable Policy Boundary（vNext Phase 7B，opt-in enforce）
-
-- 首选：`{"policy": {"enforcement_mode": "enforce"}}`
-- 兼容入口：`{"policy_enforcement_mode": "enforce"}`
-
-默认仍是 `audit`，所以旧的 legacy 行为不变：policy 可以记录 `allowed=False`，但 `effective_allowed=True`，`LegacyExecutionPipeline` 仍会调用 handler 并记录成功/失败结果。
-
-显式 `enforce` 时，`LegacyExecutionPipeline` 在旧 preflight 之后、handler 之前评估 v3 policy。如果 `policy_verdict.effective_allowed=False`，pipeline 会：
-
-1. 不调用 legacy handler。
-2. 写入一条 `ok=False` 的 execution trace。
-3. 把 `error_type` 记为 `PolicyViolation`。
-4. 抛出 `PolicyViolation("policy denied ...")`。
-
-旧的 `ExecutionEnvelope.required_permissions` 仍是原有硬权限检查，和 v3 policy enforcement 分开。测试里刻意覆盖了“profile policy deny 但 required_permissions 为空”的路径，确保 Phase 7B 拦截的是新的 `effective_allowed`，不是旧权限机制。
 
 ### 4.3.10.2 Observability Metric Boundary（vNext Phase 12，diagnostic boundary）
 
@@ -1046,7 +1032,7 @@ Phase 34 后，Dashboard `/api/system/diagnostics` 会追加 `code_standards` �
 
 对于 `hold` / `grow` / `trace` / `decay` / `import` / `migrate` / `anchor` / `plan` / `letter_write` / `request_admin_erasure` 等 mutating command，contract 要求 events 和 ledger append 同时存在；`breath` 这类 read-only command 可以没有 events / ledger append。policy preflight 被拒绝后仍 append ledger，会返回 `ledger_append_after_policy_denial`；adapter 自己绕过 command boundary 改 memory，会返回 `adapter_direct_memory_write`。
 
-这一步仍是 diagnostic：它没有替换 `LegacyExecutionPipeline`，也没有要求现有所有 handler 立刻产出 receipt。后续可以把 runtime 的 decision record、policy verdict、ledger append result 汇总成 `CommandBoundaryReceipt`，再让 diagnostics 或 release gate 调用本 contract。
+这一步仍是 diagnostic：它不拦截任何调用，也没有要求现有所有 handler 立刻产出 receipt。后续可以把 runtime 的 decision record、policy verdict、ledger append result 汇总成 `CommandBoundaryReceipt`，再让 diagnostics 或 release gate 调用本 contract。
 
 ### 4.3.10.9 Surface Context Compiler（vNext Phase 19，contract-only）
 

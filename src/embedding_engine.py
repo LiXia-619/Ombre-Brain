@@ -180,10 +180,6 @@ class BaseEmbeddingEngine(abc.ABC):
     async def generate_async(self, text: str) -> list[float]:
         """异步算一条向量（生产路径）。失败返回空列表（不抛运行期异常）。"""
 
-    def warmup(self) -> None:
-        """子类可选：提前把模型加载到内存，避免首次调用延迟。"""
-        return None
-
 
 # ============================================================
 # API 后端：OpenAI 兼容（默认 Gemini）

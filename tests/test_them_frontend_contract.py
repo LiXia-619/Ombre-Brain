@@ -78,16 +78,16 @@ def test_模型自己遇到的人不在前端露出正文():
     """
     js = _them_js(_html())
     detail = js[js.index("function renderThemPersonView("):]
-    # 可见性只能由「谁登记的」决定。跟着 known_via 走的话，模型给自己登记的人
-    # 标一个 heard_from_user 就把私有认识交出来了——而那正是当初把两个字段
-    # 拆开要防的事。
-    assert "var 可见 = p.origin === 'human';" in detail
+    # rule.md 13.3：分界是「模型怎么认识这个人的」。跟 origin 走的话，人类
+    # 亲口介绍、模型顺手登记的人会被划进不可见，而撞名又挡住人类自己登记。
+    assert "var 可见 = 听说来的;" in detail
+    assert "p.origin === 'human'" not in detail
     正文段 = detail.index("know-claims")
     条件段 = detail.index("if (可见)")
-    assert 条件段 < 正文段, "正文渲染必须在「人类登记的」这个分支里面"
+    assert 条件段 < 正文段, "正文渲染必须在「听说来的」这个分支里面"
     assert detail.index("var 听说来的") < 条件段
     留言段 = detail.index("them-note-")
-    assert 条件段 < 留言段, "留言框同样只对人类登记的人开"
+    assert 条件段 < 留言段, "留言框同样只对听说来的人开"
 
 
 def test_图标不依赖外网():

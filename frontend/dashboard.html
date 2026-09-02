@@ -909,7 +909,7 @@
   .self-fab .fab-globe { display:block; width:26px; height:26px; opacity:.9; }
   .self-fab .fab-globe svg { width:100%; height:100%; display:block; }
   .know-tabs {
-    display:flex; gap:6px; padding:0 20px 14px;
+    display:flex; gap:6px; padding:0 24px 14px;
     border-bottom:1px solid var(--border);
   }
   .know-tab {
@@ -925,7 +925,7 @@
     box-shadow:inset 2px 2px 5px var(--shadow-dark-subtle),
                inset -2px -2px 5px var(--shadow-light);
   }
-  .know-pane { padding:18px 20px 28px; overflow-y:auto; flex:1; }
+  .know-pane { padding:18px 24px 28px; overflow-y:auto; flex:1; }
   .know-state {
     font-size:12px; color:var(--text-dim); margin-bottom:10px;
   }
@@ -4841,10 +4841,10 @@ function themGroupHtml(kind, 标题, 人们, 说明) {
   for (var i = 0; i < 人们.length; i++) {
     var p = 人们[i];
     var 未读 = (p.pending_notes || []).length;
-    // 条数跟着「看不看得见」走，不跟着分栏走：这两件事拆开之后，
-    // 「你告诉它的」那一栏里也会有你看不见内容的人（模型自己登记、
-    // 但标了 heard_from_user 的），给他标个条数是假的。
-    var 副 = p.origin === 'human'
+    // 条数跟着「看不看得见」走。可见性与分栏现在是同一个字段（known_via），
+    // 所以「你告诉它的」那一栏里每个人都看得见条数，「它自己遇到的」那一栏
+    // 一个都没有——给看不见内容的人标条数是假的。
+    var 副 = p.known_via === 'heard_from_user'
       ? ((p.claims || []).length ? (p.claims.length + ' 条') : '还没记下')
       : '';
     h += '<button class="know-row" onclick="openThemPerson(\'' + esc(p.person_id) + '\')">'
@@ -4865,11 +4865,10 @@ function renderThemPersonView() {
     if (_themPeople[i].person_id === _themPersonId) p = _themPeople[i];
   }
   if (!p) { backToThemRoster(); return; }
-  // 两个独立的轴，别再用一个变量兼着：
-  //   听说来的 = 怎么认识的（known_via，模型说了算）→ 标题与措辞
-  //   可见     = 谁登记的（origin，模型改不动）    → 看得见多少、能不能留言
+  // rule.md 13.3：分界是「模型怎么认识这个人的」，不是「谁登记的」。
+  // 措辞和可见性因此是同一件事——听说来的就看得见、就能留言纠错。
   var 听说来的 = p.known_via === 'heard_from_user';
-  var 可见 = p.origin === 'human';
+  var 可见 = 听说来的;
   var 名 = esc(aiName());
   var 别名 = (p.names || []).slice(1);
 
@@ -4887,10 +4886,9 @@ function renderThemPersonView() {
      + (听说来的
         ? 名 + ' 没见过这个人，关于他的一切都是你转述的。'
         : '第一手的印象，' + 名 + ' 自己写下的。')
-     // 看得见多少是另一回事，由「谁登记的」决定，跟上面那句不一定同向。
      + (可见
-        ? '这个人是你登记的，所以这一页你看得见全文——记岔的地方只有你认得出来。'
-        : '这个人是 ' + 名 + ' 自己登记的，内容不出这层边界，你只看得到称呼。')
+        ? '关于他的每一句都来自你，所以这一页你看得见全文——记岔的地方只有你认得出来。'
+        : '第一手的印象不出这层边界，你只看得到称呼。')
      + '</p>';
 
   h += '<div class="know-field"><div class="know-field-label">称呼</div>'
@@ -4904,9 +4902,9 @@ function renderThemPersonView() {
      + ' 会在下一次回想时被告知一次新旧对照——正文一个字不动，那些句子是 ' + 名 + ' 写的。</p>'
      + '</div>';
 
-  // 这一段是可见性，只能跟 origin。跟着 known_via 走的话，模型给自己登记的人
-  // 标一个 heard_from_user 就把私有认识交出来了——而那正是当初把两个字段
-  // 拆开要防的事（models.py 的 human_visible 有同样的说明）。
+  // 可见性跟 known_via。标成 heard_from_user 本身就是在说「我没见过这个人，
+  // 全是转述」——那一份里没有第一手印象可保护（models.py 的 human_visible
+  // 有同样的说明）。
   if (可见) {
     var claims = p.claims || [];
     h += '<div class="know-field"><div class="know-field-label">'

@@ -83,3 +83,8 @@ tmp_hnf1_pas_pair_smoke_*/
 # 这件事写明——按文件系统硬遍历的 grep -r / find 仍然会看到两份，
 # 分析脚本得自己排除。
 .kilo/
+
+# 覆盖率产物（CI 每次重新生成）
+coverage.xml
+.coverage
+htmlcov/

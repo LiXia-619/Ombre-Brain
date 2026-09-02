@@ -7,7 +7,7 @@
     },
     {
       "path": "frontend/dashboard.html",
-      "sha256": "7b9c6d7a686731516bcd6c0baad2452d59c57998c5d76c29fda73a2e43678ac0",
+      "sha256": "331d22e2cf279d0f1f761df3f65b7b0716addac82a1879a0c9911ab8684e7dd8",
       "size": 573902
     },
     {
@@ -572,7 +572,7 @@
     },
     {
       "path": "src/server.py",
-      "sha256": "18453eb319d6c360671e953fa2727178fbcf8f0f53046300afb1777e6321bfe7",
+      "sha256": "25df447008080d9dff7f7e519fa60f0db4c545e333eb3302c2221919069c91e2",
       "size": 79555
     },
     {
@@ -612,7 +612,7 @@
     },
     {
       "path": "src/tools/breath/__init__.py",
-      "sha256": "28afbeac055bb9c853f3f30cb5c31f28d8dfae65694df90d5d61b878309b91a0",
+      "sha256": "4f22c2285bfbbc0ed19c08762eed5d9b3ebb6951634429131d42c65948dab955",
       "size": 8912
     },
     {
@@ -812,7 +812,7 @@
     },
     {
       "path": "src/web/config_api.py",
-      "sha256": "edbf3dc6811544d537f05a96df5b9366d4ca228b0a36f483d56f6bfca17f558b",
+      "sha256": "5e99ac9704c1feb3696e761360b731203f14dcb872bc4d78bf87713a3b28cd63",
       "size": 73932
     },
     {
@@ -882,7 +882,7 @@
     },
     {
       "path": "src/web/system.py",
-      "sha256": "712451276aec1f5ab09a9eb3c4787019e6ff8d204829139c1d474fe57e6a9e7e",
+      "sha256": "e3a7d95ec251ea1e4f577dda34faf7a1528ad74d6a71d5b69d09ba8c2ffa9699",
       "size": 56138
     },
     {

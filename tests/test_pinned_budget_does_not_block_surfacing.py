@@ -136,3 +136,64 @@ async def test_report_notices_when_pins_exceed_the_budget(monkeypatch):
     report = await _report(monkeypatch, [_core("a", "rule " * 5000)], 1000)
     assert report["required_tokens"] > report["limit_tokens"]
     assert report["largest_entry_tokens"] > report["limit_tokens"]
+
+
+# ---- 默认预算必须装得下钉满的核心准则 ----
+
+_DEFAULT_BREATH_TOKENS = 20000
+
+
+def _fallbacks():
+    import re
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    found = {}
+    for rel in (
+        "src/tools/breath/__init__.py",
+        "src/web/config_api.py",
+        "src/web/system.py",
+        "frontend/dashboard.html",
+    ):
+        text = (root / rel).read_text(encoding="utf-8")
+        found[rel] = {
+            int(n)
+            for n in re.findall(r"breath_max_tokens[^\n]*?\|\|\s*(\d+)", text)
+            + re.findall(r'breath_max_tokens"\)\s*or\s*(\d+)', text)
+            + re.findall(r'breath_max_tokens"\)\s*or\s*(\d+)\)', text)
+        }
+    return found
+
+
+def test_every_fallback_agrees_on_the_default():
+    for rel, values in _fallbacks().items():
+        assert values, f"{rel} 里没找到 breath_max_tokens 的 fallback"
+        assert values == {_DEFAULT_BREATH_TOKENS}, f"{rel} 的 fallback 是 {values}"
+
+
+def test_config_example_matches_the_code_default():
+    import re
+    from pathlib import Path
+
+    text = (Path(__file__).resolve().parents[1] / "config.example.yaml").read_text(
+        encoding="utf-8"
+    )
+    match = re.search(r"breath_max_tokens:\s*(\d+)", text)
+    assert match is not None
+    assert int(match.group(1)) == _DEFAULT_BREATH_TOKENS
+
+
+def test_the_default_fits_a_full_set_of_core_rules():
+    from tools._common import _DEFAULT_MAX_PINNED
+
+    # 一条 250 字的核心准则约 427 token；钉满时必须还剩得下普通浮现
+    per_rule = 427
+    needed = _DEFAULT_MAX_PINNED * per_rule
+    assert needed < _DEFAULT_BREATH_TOKENS, f"钉满要 {needed}，预算只有 {_DEFAULT_BREATH_TOKENS}"
+    assert _DEFAULT_BREATH_TOKENS - needed >= per_rule * 5
+
+
+def test_the_default_stays_under_the_safety_cap():
+    from tools.breath.surface import _BREATH_SAFETY_CAP
+
+    assert _DEFAULT_BREATH_TOKENS < _BREATH_SAFETY_CAP

@@ -8008,7 +8008,7 @@ async function loadConfig() {
     }
     var sf = cfg.surfacing || {};
     document.getElementById('cfg-sf-breath-results').value = sf.breath_max_results || 20;
-    document.getElementById('cfg-sf-breath-tokens').value = sf.breath_max_tokens || 10000;
+    document.getElementById('cfg-sf-breath-tokens').value = sf.breath_max_tokens || 20000;
     document.getElementById('cfg-sf-feel-tokens').value = sf.feel_max_tokens || 15000;
     document.getElementById('cfg-timezone').value = cfg.timezone || 'Asia/Shanghai';
     document.getElementById('config-readonly').innerHTML =
@@ -8304,7 +8304,7 @@ async function saveConfig(persist) {
     merge_threshold: Number.isFinite(mergeThreshold) ? mergeThreshold : 75,
     surfacing: {
       breath_max_results: parseInt(document.getElementById('cfg-sf-breath-results').value) || 20,
-      breath_max_tokens: parseInt(document.getElementById('cfg-sf-breath-tokens').value) || 10000,
+      breath_max_tokens: parseInt(document.getElementById('cfg-sf-breath-tokens').value) || 20000,
       feel_max_tokens: parseInt(document.getElementById('cfg-sf-feel-tokens').value) || 15000,
     },
     timezone: (document.getElementById('cfg-timezone').value || '').trim(),

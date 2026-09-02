@@ -94,7 +94,7 @@ async def test_dispatch_keeps_default_breath_budget_and_allows_explicit_headroom
     await dispatch(max_tokens=35_000)
     await dispatch(max_tokens=50_000)
 
-    assert seen == [10_000, 10_000, 35_000, 40_000]
+    assert seen == [20_000, 10_000, 35_000, 40_000]
 
 
 async def _search(query, **overrides):

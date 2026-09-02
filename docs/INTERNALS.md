@@ -917,7 +917,7 @@ v3 `PolicyEngine` 现在区分两个结果：
 
 默认 `enforcement_mode="audit"`，`audit_only=True`，即使 `allowed=False`，`effective_allowed` 也保持 True。
 
-**注意：`enforce` 目前没有下游。** 唯一读过 `effective_allowed` 去拦调用的是 `LegacyExecutionPipeline`，而它自己早已没有任何调用者，3.9.3 已删除。`PolicyEngine` 现在只被测试构造，生产路径不经过它，配置里也没有 `policy.enforcement_mode` 这一项。这套判断保留为契约与测试对象；真要接 enforcement，得先决定在哪一层拦。
+**注意：`enforce` 目前没有下游。** 唯一读过 `effective_allowed` 去拦调用的是 `LegacyExecutionPipeline`，而它自己早已没有任何调用者，3.9.4 已删除。`PolicyEngine` 现在只被测试构造，生产路径不经过它，配置里也没有 `policy.enforcement_mode` 这一项。这套判断保留为契约与测试对象；真要接 enforcement，得先决定在哪一层拦。
 
 Decision summary 继续保留 `policy_allowed` 旧字段，同时新增 `policy_effective_allowed`。这避免把“策略判断”和“当前是否阻断”混成一个概念。
 

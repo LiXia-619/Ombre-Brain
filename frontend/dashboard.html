@@ -5436,9 +5436,18 @@ async function loadBuckets() {
     selectedBucketIds.forEach(function(id) { if (!liveIds.has(id)) selectedBucketIds.delete(id); });
     updateStats();
     buildFilters();
-    // 数据刷新不等于用户切换视图：继续应用当前筛选，并保留所在页。
+    // 数据刷新不等于用户切换视图：搜索框里还有查询词就重跑搜索，否则继续应用
+    // 当前筛选。两条路都保留所在页。
+    // 从搜索结果里归档/删除一条时，这里如果无条件走 filterBuckets(allBuckets)，
+    // 列表会跳回「当前筛选下的全部桶」，而搜索框里的词还在——用户看到的是
+    // 「输入框有搜索词但列表不是搜索结果」，很容易对下一条误操作。
     // 若刷新后页数减少，_paintBuckets 会自动把 bucketPage 收敛到末页。
-    renderBuckets(filterBuckets(allBuckets), true);
+    var activeQuery = (document.getElementById('search-input') || {}).value || '';
+    if (activeQuery.trim()) {
+      await searchBuckets(activeQuery.trim(), true);
+    } else {
+      renderBuckets(filterBuckets(allBuckets), true);
+    }
     if (data.length === 0 && window.ObPet) window.ObPet.react('empty');
   } catch (e) {
     if (generation !== bucketLoadGeneration || requestedSort !== bucketSort) return;
@@ -5698,7 +5707,7 @@ function renderMeaningHtml(value) {
   '</section>';
 }
 
-async function searchBuckets(query) {
+async function searchBuckets(query, preservePage) {
   var seen = {}, merged = [];
   _localBucketMatches(query).forEach(function(b) { if (!seen[b.id]) { seen[b.id] = 1; merged.push(b); } });
   // 服务端语义搜索：补充本地字面没匹配到、但语义相关的桶（向量化未开启时会失败，自动退化为纯本地）
@@ -5709,7 +5718,7 @@ async function searchBuckets(query) {
       if (Array.isArray(results)) results.forEach(function(b) { if (!seen[b.id]) { seen[b.id] = 1; merged.push(b); } });
     }
   } catch (e) { /* 离线 / 无向量化：退化为纯本地字面 + 模糊匹配 */ }
-  renderBuckets(merged);
+  renderBuckets(merged, preservePage);
 }
 
 let detailLoadGeneration = 0;

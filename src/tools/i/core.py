@@ -35,6 +35,7 @@ I 是 OB 的自我感知层，但它不是日记，是沉淀物。
 
 from errors import ToolInputError
 from datetime import datetime
+from utils import parse_iso_datetime
 from typing import Optional
 
 from .. import _runtime as rt
@@ -517,7 +518,9 @@ def _stall_note(meta: dict, passes: int) -> str:
     created = str(meta.get("created") or "")
     if created:
         try:
-            days = (datetime.now() - datetime.fromisoformat(created)).days
+            # 走 parse_iso_datetime：它会把带时区的值归一成本地 naive，
+            # 直接 fromisoformat 碰上带偏移的 created 会和 naive 的 now() 相减报错。
+            days = (datetime.now() - parse_iso_datetime(created)).days
         except (TypeError, ValueError):
             days = None
         if days is not None and days >= 1:

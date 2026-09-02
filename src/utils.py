@@ -1204,8 +1204,14 @@ def count_tokens_approx(text: str) -> int:
 
 
 def now_iso() -> str:
+    """当前时间的 ISO 串，带本地时区偏移。
+
+    以前这里是裸的本地墙上时间，没有偏移也没有 Z。单机单时区时没问题，
+    但只要库被跨时区的机器写过、或者赶上夏令时回拨的那一小时，字符串里就
+    **不存在**能还原真相的信息了——而且 OB 进程外的消费者（导出的 JSON、
+    读桶算衰减的下游工具）连「写这条的机器在哪」都无从得知。
+
+    带上偏移之后，旧的 naive 值不受影响：parse_iso_datetime 两种都吃，
+    aware 的会被归一成本地 naive，进程内的比较行为一个字都不变。
     """
-    Return current time as ISO format string.
-    返回当前时间的 ISO 格式字符串。
-    """
-    return datetime.now().isoformat(timespec="seconds")
+    return datetime.now().astimezone().isoformat(timespec="seconds")

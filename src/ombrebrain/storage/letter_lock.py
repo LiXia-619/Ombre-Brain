@@ -58,9 +58,19 @@ def letter_lock_state(
     if lock_type == "timed" and unlock_date:
         try:
             parsed = datetime.fromisoformat(str(unlock_date).replace("Z", "+00:00"))
-            expired = bool(parsed.tzinfo) and (
-                now or datetime.now(timezone.utc)
-            ) >= parsed.astimezone(timezone.utc)
+            # 不再要求 parsed 带时区。原先是 `bool(parsed.tzinfo) and ...`：
+            # 没有时区就直接判「没过期」，于是一封 2020 年就该解锁的信永远锁着，
+            # letter_read 一辈子看不到它，而 Dashboard 照常显示——两边说法不一致，
+            # 用户无从判断是数据没了还是工具坏了。
+            #
+            # 裸时间交给 astimezone() 按系统本地时区解释，和 OB 其它时间字段
+            # 一个口径。写入路径（tools/plan/core.py）硬要求带时区，所以裸值只
+            # 可能来自手改 Markdown、导入外部记忆包或从旧备份恢复——而「文件可以
+            # 手改」正是这套存储的卖点。最坏是早/晚解锁几小时，远好过永不解锁。
+            reference = now or datetime.now(timezone.utc)
+            expired = reference.astimezone(timezone.utc) >= parsed.astimezone(
+                timezone.utc
+            )
         except (TypeError, ValueError):
             expired = False
     effective_type = "none" if expired else lock_type

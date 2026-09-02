@@ -452,8 +452,8 @@
     },
     {
       "path": "src/ombrebrain/storage/letter_lock.py",
-      "sha256": "0cdc35f6dafff6ed0bdb4979d91bb2b03c16a93a3f6bbfcc3c6608958633a231",
-      "size": 3370
+      "sha256": "59aad6ae1b99de499edafb4049ab44243bdfaafc4fcc139f40e567ba1d96d9bd",
+      "size": 4217
     },
     {
       "path": "src/ombrebrain/storage/media_store.py",

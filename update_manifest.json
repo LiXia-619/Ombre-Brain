@@ -32,8 +32,8 @@
     },
     {
       "path": "src/VERSION",
-      "sha256": "aa77303aac98eddf36b60c556bb4f1252b4829be76a80d94853a5a2ecd1f0766",
-      "size": 6
+      "sha256": "723f9234af21ed1020199261fa4afe16cd82e7109e7b1a58d74f5735fb9c91ce",
+      "size": 7
     },
     {
       "path": "src/bm25_index.py",
@@ -432,7 +432,7 @@
     },
     {
       "path": "src/ombrebrain/storage/letter_lock.py",
-      "sha256": "59aad6ae1b99de499edafb4049ab44243bdfaafc4fcc139f40e567ba1d96d9bd",
+      "sha256": "36b84611d74cf5b8a2aed5566669363144efd52e30bdfefb2910c6c566818f00",
       "size": 4217
     },
     {
@@ -492,7 +492,7 @@
     },
     {
       "path": "src/ombrebrain/them/service.py",
-      "sha256": "19f572efb905dfb4f5ac03af11c596ea7332066e7597ee3f01a0326a36a808aa",
+      "sha256": "2a6a370e959669fd73c2cc5070cfcd40d7a8c2308bf518265311a33e0f10dd5d",
       "size": 55949
     },
     {
@@ -527,7 +527,7 @@
     },
     {
       "path": "src/ombrebrain/you/service.py",
-      "sha256": "42d71af476dda0e928570b097a5fd2600906a54e5662319e67eec1d1ece2c0fc",
+      "sha256": "b084c473965dd5bb106142158de2198220f70df9ebc0454d097322dd9663d66f",
       "size": 31580
     },
     {
@@ -717,7 +717,7 @@
     },
     {
       "path": "src/tools/plan/core.py",
-      "sha256": "a2142f05219e0d615f1e3e3efab707405f3bc6c17cfc583633c7ed41a1a288db",
+      "sha256": "785b2788f4528de882506754db5cbcc15b34032d9cb030acc8f96c3b7ee88e1a",
       "size": 23184
     },
     {
@@ -887,5 +887,5 @@
     }
   ],
   "rollout_strategy": "single-node",
-  "version": "3.9.4"
+  "version": "3.6.10"
 }

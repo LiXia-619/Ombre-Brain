@@ -305,9 +305,9 @@ feel 桶自身：
 4. **浮现模式**（无 `query`；`breath()` 固定走这里）：pinned/显式 permanent 桶展示为「核心准则」+ 未解决桶按衰减分排序，**冷启动**（`activation_count==0 && importance>=8`）的桶最多 2 个插到最前；后续排序**有两条互斥路径**：当 `surfacing.sampling.enabled=true` 时走加权无放回采样（`top_k` / `sample_k` / `temperature` 控制；详见 §7.1），否则走原 Top-1 固定 + Top-2~20 随机洗牌；**再按 `surfacing.recent_slots`（默认 3）给近 7 天创建的桶补足预留位置**（3.6.0，见下）；按 `max_results` 硬截断。**排除 anchor 与 protected 桶**：anchor 是坐标系；protected 只防衰减，不进入核心准则、未解决、久未浮现或偶遇池。浮现**不调用** `touch()`。每条返回正文后附一行紧凑 `👣 Footprint`，只表达创建、补充、淡去、归档、恢复等有意义的变迁，不展示 touch/索引噪声。**末尾追加 `=== 久未浮现 ===` 段**：从久未激活的高重要度桶里随机抽 1～2 条，模拟「突然想起来」；3.6.0 起 **24 小时内新建的桶不进这个池**——`activation_count==0` 既可能是「很久没被想起」也可能是「还没来得及被想起」，判据本身分不出来，得靠年龄。3.6.0 起本模式也接 `date_from`/`date_to`（核心准则不受时间过滤影响：它们是准则，不是那段时间里发生的事）。
 5. **检索模式**（有 `query`；`breath_search()` 固定走这里）：每个 query 只生成一次查询向量，与 rapidfuzz/BM25 多维评分共同进入 `BucketManager.search()` → 过滤 `feel/plan/letter`，**pinned/permanent/protected 仍可被显式检索命中**：pinned/permanent 加 `📌 [核心准则]`，protected 加 `🛡️ [受保护记忆]` → 纯语义候选相似度 `>=0.65` 标 `[语义关联]`，且不能绕过 domain/tags/type 过滤 → **命中不 `touch()`**（3.6.0：检索与强化解耦，见 §2.1 数据流约束）。查询也会检索 archive；归档命中返回保留的 Markdown 原文与 Footprint，明确邀请模型判断是否值得再次回忆，并显示 `trace(bucket_id="...", restore=True)`。查询只发现、不自动恢复，也不 touch 归档桶。结果不足时保留设计上的自由联想，但 protected 不进入这一非命中随机通道。embedding 不可用时明确提示后继续关键词/BM25；桶一旦命中，返回层直接使用当前存储的完整 `content`，不调用 dehydrate、不剥除 wikilink、不截断或改写。**不过滤 anchor**（设计：主动检索时希望能找到坐标系桶）。catalog 同样保留 protected 并使用相同的受保护标记。
 
-#### 调用意图 `mode`（3.7.0）
+#### 调用意图 `mode`（3.6.4）
 
-`breath_search` / `breath_advanced` 的 `mode` 声明**这次检索是谁发起的**，默认 `"manual"`（行为与 3.7.0 之前逐字一致）。
+`breath_search` / `breath_advanced` 的 `mode` 声明**这次检索是谁发起的**，默认 `"manual"`（行为与 3.6.4 之前逐字一致）。
 
 | mode | 含义 | 额外尊重的标记 |
 |---|---|---|
@@ -322,7 +322,7 @@ feel 桶自身：
 
 作用范围只有检索道。无 query 的浮现道走 `spontaneous`、`importance_min` 走 `importance`，两者本来就尊重 `dont_surface`；catalog 与 feel 是定向通道，不受 `mode` 影响。未知值（空串、拼错）一律当 `manual`——默认必须是「今天的行为」，一个拼错的意图不该悄悄放宽或收紧过滤。
 
-#### `with_ids`：给机器读的结果清单（3.7.0）
+#### `with_ids`：给机器读的结果清单（3.6.4）
 
 `with_ids=True` 时在返回文本**末尾**追加一段，默认不追加：
 
@@ -337,7 +337,7 @@ feel 桶自身：
 
 `omitted_by_policy` 是被 `dont_surface`/`digested` 挡掉的条数——给它是为了让「过滤有没有真的生效」可观测：静默为 0 和静默漏出来，在调用方眼里长得一样。
 
-> **为什么不用 `structuredContent`**：`-> str` 的工具今天已经有 `structuredContent`，但 FastMCP 把原始类型包成 `{"result": "<同一段渲染文本>"}`，没有信息量。要放进 `bucket_ids` 必须改成返回 `CallToolResult`（`content` 可保持逐字不变），代价是 `outputSchema` 从 `{"result": string}` 变成 `None`。3.7.0 选择不动返回类型，把契约放在文本里的独立块中。
+> **为什么不用 `structuredContent`**：`-> str` 的工具今天已经有 `structuredContent`，但 FastMCP 把原始类型包成 `{"result": "<同一段渲染文本>"}`，没有信息量。要放进 `bucket_ids` 必须改成返回 `CallToolResult`（`content` 可保持逐字不变），代价是 `outputSchema` 从 `{"result": string}` 变成 `None`。3.6.4 选择不动返回类型，把契约放在文本里的独立块中。
 
 #### 检索的门：召回与排序目前没有分开（已知设计债）
 
@@ -511,12 +511,12 @@ if text_match or semantic_match: 入选
    「可以考虑 `hold(pinned=True)` 升级」，避免同一批 feel 每场梦都刷同样的提示。
 7. **「我觉得」I 候选段**：列出待沉淀的候选，每条附本次撞上的材料与见证次数。候选**不受 48 小时窗口限制**（否则老于窗口的候选永远凑不满三次跨日见证），仍排除 pinned / resolved / protected。
 
-   **3.8.0 起按「还差几次见证」排，不按 `created`。** 原先是 `created` 升序 + 无上限，而这一段是逐条撞预算、撞满即丢且**不计见证**——最旧的永远排在队首吃预算，新写的排在队尾拿不到见证，于是永远转不了正、又永远留在队列里挡着后面的。真机反馈的「新的转不了正」和「旧的被反复触发」是同一件事的两面。
+   **3.6.5 起按「还差几次见证」排，不按 `created`。** 原先是 `created` 升序 + 无上限，而这一段是逐条撞预算、撞满即丢且**不计见证**——最旧的永远排在队首吃预算，新写的排在队尾拿不到见证，于是永远转不了正、又永远留在队列里挡着后面的。真机反馈的「新的转不了正」和「旧的被反复触发」是同一件事的两面。
    - 缺得最多的排最前；同样缺的按「最久没被见证」轮转，避免固定几条把名额包了。
    - **攒够 `I_PROMOTE_THRESHOLD` 的拆出去压成一行提醒**，不给完整块与碰撞材料，**也不计见证**：3/3 之后再被见证一百次也不会有任何变化，它需要的是模型去 `I(promote=...)` 或让它沉下去；给它整块预算正是把还缺见证的挤出去的原因。
    - 上限 `_MAX_SELF_CANDIDATES_PER_DREAM`（5），未展开的计入「另有 N 条…不计见证」。
 
-   > **没有给这一段预留子预算**（3.8.0 试过又撤了）。最初的判断是「它排最后、无预留，被前面几段吃光」，实测 `dream_self_tokens` 取 0 与 3000 输出逐字相同：前面每一段都自限——feel 按相关性挑选、不相关的整段筛掉，放不下时压成短摘录；plan 放不下会往回弹。在任何能构造的场景里都留有余量，预留因此没有可观测效果。要判断预算是不是真瓶颈，看输出里那行「（另有 N 条待沉淀候选这次没展开，不计见证。）」。
+   > **没有给这一段预留子预算**（3.6.5 试过又撤了）。最初的判断是「它排最后、无预留，被前面几段吃光」，实测 `dream_self_tokens` 取 0 与 3000 输出逐字相同：前面每一段都自限——feel 按相关性挑选、不相关的整段筛掉，放不下时压成短摘录；plan 放不下会往回弹。在任何能构造的场景里都留有余量，预留因此没有可观测效果。要判断预算是不是真瓶颈，看输出里那行「（另有 N 条待沉淀候选这次没展开，不计见证。）」。
 
 整体输出受 `surfacing.dream_max_tokens`（默认 20000）硬预算约束，超预算只整段省略、绝不
 截断正文；用户可手动传更大的 `window_hours`，但软上限 40 仍生效；plan 历史不参与 token
@@ -570,7 +570,7 @@ Dashboard 的既有 `/api/letter/{letter_id}` PATCH 同时承载两类互斥请�
 - `content` 非空 → **写候选**。创建一条普通 `dynamic` 桶，tag `__i_candidate__`（刻意不是 `__i__`）、`i_stage="candidate"`、`i_dream_dates=[]`。候选照常浮现和衰减；在 dream 的普通近期记忆段仍受 `window_hours` 限制，但待沉淀候选段不受该时间窗限制，避免旧候选永久失去三次跨日见证的机会。`aspect` 可选维度：`nature`(本质) / `values`(看重的) / `patterns`(规律) / `limits`(局限) / `becoming`(在变成什么) / `uncertainty`(不确定的) / `stance`(立场)。
 - `content` 空 或 `read=True` → **读取模式**，返回三段正式条目（当前自我认知 / 我正在改的主意 / 已经被取代的，各自按 `limit` 截断）＋ 待沉淀候选清单；没有 `i_from_candidate` 的历史条目标注为「早期直接写入，未经沉淀」。折叠的两段也有上限：攒了几十条被取代的条目之后，当前信念不该被历史淹掉。
 - `promote="桶ID"` → **升级**。要求该候选的 `i_dream_dates` 已有 ≥ `I_PROMOTE_THRESHOLD`（3）个不同日期，否则拒绝并报告还差几次。通过后创建 `type="i"` 桶（`dont_surface=True`、`i_from_candidate`、继承 `i_dream_dates`），候选桶保留原文并改标 `i_stage="promoted"` / `i_promoted_to` / `resolved=True`。同时传 `content` 可用提炼后的措辞落成正式条目。
-- `supersedes="正式I条目ID"` → **声明取代**（3.9.0）。见下面 3.11.1。
+- `supersedes="正式I条目ID"` → **声明取代**（3.6.6）。见下面 3.11.1。
 - 正式 I 条目带 `dont_surface=True`：**不参与普通 `breath` / `dream`**；只在 `SessionStart` 时自动附带最近 3 条——**被取代的和此刻正被质疑的不占这三个名额**。
 
 #### 3.11.1 取代与挂起（`supersedes`）
@@ -598,7 +598,7 @@ Dashboard 的既有 `/api/letter/{letter_id}` PATCH 同时承载两类互斥请�
 
 dream 侧配合（`src/tools/dream/hints.py` + `output.py`）：
 
-- `collect_self_candidates(all_buckets, window_hours)` 收集全部待沉淀候选，不受普通记忆的 `window_hours` 限制；**按「还差几次见证」排序**（3.8.0 起，不再是创建时间——旧的排在队首会把新候选永远挤出预算），攒够门槛的拆进 `ready`，其余取前 `_MAX_SELF_CANDIDATES_PER_DREAM`（5）条，并继续受最终输出 token 预算约束。用**已落盘向量**（不发新请求）为每条取相似度 ≥ 0.35 的前 3 条对照材料；对照池 = 全部正式 I 条目 + 全部其它候选 + 最近 200 条普通桶（排除 `letter`）。向量不可用时只列候选并明说。
+- `collect_self_candidates(all_buckets, window_hours)` 收集全部待沉淀候选，不受普通记忆的 `window_hours` 限制；**按「还差几次见证」排序**（3.6.5 起，不再是创建时间——旧的排在队首会把新候选永远挤出预算），攒够门槛的拆进 `ready`，其余取前 `_MAX_SELF_CANDIDATES_PER_DREAM`（5）条，并继续受最终输出 token 预算约束。用**已落盘向量**（不发新请求）为每条取相似度 ≥ 0.35 的前 3 条对照材料；对照池 = 全部正式 I 条目 + 全部其它候选 + 最近 200 条普通桶（排除 `letter`）。向量不可用时只列候选并明说。
 - 专用候选段排在 dream 其它上下文之后，受 `surfacing.dream_max_tokens` 预算约束；候选本身也可能作为普通近期记忆，或作为另一条候选的碰撞材料出现。
 - 见证计数由 `dream/__init__.py` 在最终输出渲染完成后调 `tools.i.record_dream_pass()` 写入，按不同日期去重。只要待沉淀候选的结构化记忆块实际出现在本次输出（近期记忆、候选主块或碰撞材料），就算一次见证；所有位置都因预算未展开时才不计次。
 - 同一处还调 `record_dream_offer(SelfReview.pending_ids)`，给**队列里的每一条**（包括这次没排上的）记一次「这天做过梦」，写进 `i_dream_offered`（按天去重，只存计数不存日期列表以免 metadata 无界增长）。见证数回答「被看见过几次」，这个数回答「本可以被看见几次」——只有前者时，「等了 13 天还是 0/3」既可能是没做几次梦（不是 bug），也可能是每场都没排到（是 bug），没法分辨。`I(read=True)` 把两者渲染成「已等 13 天、经历 8 场梦，一次都没排到」。
@@ -917,7 +917,7 @@ v3 `PolicyEngine` 现在区分两个结果：
 
 默认 `enforcement_mode="audit"`，`audit_only=True`，即使 `allowed=False`，`effective_allowed` 也保持 True。
 
-**注意：`enforce` 目前没有下游。** 唯一读过 `effective_allowed` 去拦调用的是 `LegacyExecutionPipeline`，而它自己早已没有任何调用者，3.9.4 已删除。`PolicyEngine` 现在只被测试构造，生产路径不经过它，配置里也没有 `policy.enforcement_mode` 这一项。这套判断保留为契约与测试对象；真要接 enforcement，得先决定在哪一层拦。
+**注意：`enforce` 目前没有下游。** 唯一读过 `effective_allowed` 去拦调用的是 `LegacyExecutionPipeline`，而它自己早已没有任何调用者，3.6.10 已删除。`PolicyEngine` 现在只被测试构造，生产路径不经过它，配置里也没有 `policy.enforcement_mode` 这一项。这套判断保留为契约与测试对象；真要接 enforcement，得先决定在哪一层拦。
 
 Decision summary 继续保留 `policy_allowed` 旧字段，同时新增 `policy_effective_allowed`。这避免把“策略判断”和“当前是否阻断”混成一个概念。
 

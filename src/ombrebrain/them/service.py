@@ -685,7 +685,7 @@ class ThemService:
             metadata = dict(bucket.get("metadata") or {})
             bucket_type = str(metadata.get("type") or "dynamic").strip().lower()
             if bucket_type == "letter":
-                # 3.8.0：信可以当依据，但只限**对 AI 已经开着**的那些。
+                # 3.6.5：信可以当依据，但只限**对 AI 已经开着**的那些。
                 #
                 # 放开的理由：有人每天把日记写进 letter，那就是他关于这些人最厚
                 # 的一手材料；一概拒掉等于让 them 在这种用法下根本没法用。

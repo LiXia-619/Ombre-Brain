@@ -158,7 +158,7 @@ EXPECTED_TOOL_PROPERTIES = {
     "letter_lock_update": {"letter_id", "lock_type", "unlock_date"},
     "letter_read": {"query", "limit", "author", "date_from", "date_to"},
     "feel": {"query", "max_tokens"},
-    # supersedes：3.9.0 的「声明取代即挂起旧条目」。
+    # supersedes：3.6.6 的「声明取代即挂起旧条目」。
     "I": {"content", "aspect", "read", "limit", "promote", "supersedes"},
     "dream": {"window_hours"},
 }
@@ -340,7 +340,7 @@ def _bucket_ids(text: str) -> set[str]:
 
 
 def _i_witness_progress(text: str, bucket_id: str) -> tuple[int, int]:
-    # 括号里 3.9.0 起会跟一段滞留诊断（「已等 N 天、经历 M 场梦」之类），
+    # 括号里 3.6.6 起会跟一段滞留诊断（「已等 N 天、经历 M 场梦」之类），
     # 所以别把右括号钉死在「次 dream」后面——这里要的只是见证进度那两个数。
     match = re.search(
         rf"{re.escape(bucket_id)}\s+（(\d+)/(\d+) 次 dream[^）]*）",

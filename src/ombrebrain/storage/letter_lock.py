@@ -1,6 +1,6 @@
 """Letter 的锁语义 —— 纯元数据计算，没有任何 I/O。
 
-原先长在 `tools/plan/core.py` 里。3.8.0 下沉到这里，是因为 `you` / `them` 的
+原先长在 `tools/plan/core.py` 里。3.6.5 下沉到这里，是因为 `you` / `them` 的
 证据闸也要判「这封信对 AI 开没开」，而 `ombrebrain/` 不能反过来 import `tools/`
 （分层是单向的）。
 

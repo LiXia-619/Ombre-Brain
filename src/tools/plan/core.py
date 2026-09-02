@@ -37,7 +37,7 @@ from .._common import (
 )
 from utils import strip_wikilinks, get_ai_name, get_owner_name, get_tzinfo, get_timezone_name
 from errors import ToolInputError, safe_error_detail
-# 锁语义 3.8.0 下沉到 ombrebrain/storage/letter_lock.py：you / them 的证据闸
+# 锁语义 3.6.5 下沉到 ombrebrain/storage/letter_lock.py：you / them 的证据闸
 # 也要判「这封信对 AI 开没开」，而 ombrebrain 不能反向 import tools。
 # 这里按原名再导出，所有既有调用点不变。
 from ombrebrain.storage.letter_lock import (  # noqa: F401

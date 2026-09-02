@@ -43,7 +43,6 @@ from ..you.models import (
     VALID_BASES,
     EvidenceEdge,
     ModuleState,
-    ReviewReceipt,
     Scope,
     evidence_digest,
     utc_now,
@@ -834,28 +833,7 @@ class ThemService:
         return self._promote_if_ready(stored)
 
     def _record_confirmation(self, claim: ThemClaim) -> ThemClaim:
-        """记一笔"模型今天重申过"。同一天重复调用只算一次。
-
-        判重用的"今天"必须和收据时间戳同源：另取一次 now 的话，跨日那一瞬两个
-        时间源会给出不同答案，同一天可能记下两条收据，三日门槛就少守了一天。
-        """
-        stamped = utc_now()
-        today = stamped[:10]
-        already = any(
-            receipt.review_date == today
-            and receipt.evidence_revision == claim.evidence_revision
-            for receipt in claim.review_receipts
-        )
-        if already:
-            return claim
-        receipt = ReviewReceipt(
-            reviewed_at=stamped,
-            reviewer_role_id=claim.scope.observer_role_id,
-            evidence_revision=claim.evidence_revision,
-            policy_version=THEM_POLICY_VERSION,
-            result="reaffirmed",
-        )
-        return replace(claim, review_receipts=(*claim.review_receipts, receipt))
+        return claim.with_confirmation(THEM_POLICY_VERSION, utc_now())
 
     def _promote_if_ready(self, claim: ThemClaim) -> ThemClaim:
         if claim.lifecycle != "candidate":

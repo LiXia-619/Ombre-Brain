@@ -17,7 +17,6 @@ from .models import (
     VALID_BASES,
     EvidenceEdge,
     ModuleState,
-    ReviewReceipt,
     Scope,
     YouClaim,
     evidence_digest,
@@ -498,34 +497,7 @@ class YouService:
         return self._promote_if_ready(stored)
 
     def _record_confirmation(self, claim: YouClaim) -> YouClaim:
-        """给这条认识记一笔"模型今天重申过"。同一天重复调用只算一次。
-
-        收据绑当前的 evidence_revision：证据集合一变，先前的重申自动不算数
-        （见 models.YouClaim.review_date_count），所以"改一条 you 也要重新攒
-        三天"不需要另写逻辑。正文变更的重置在 write() 里单独处理，因为
-        evidence_revision 不含正文。
-        """
-
-        # "今天"和收据时间戳必须同源：ReviewReceipt.review_date 取的是
-        # reviewed_at 的前 10 位，这里若另用 datetime.now() 判重，两个时间源在
-        # 跨日的那一瞬间会给出不同答案，可能让同一天记下两条收据。
-        stamped = utc_now()
-        today = stamped[:10]
-        already = any(
-            receipt.review_date == today
-            and receipt.evidence_revision == claim.evidence_revision
-            for receipt in claim.review_receipts
-        )
-        if already:
-            return claim
-        receipt = ReviewReceipt(
-            reviewed_at=stamped,
-            reviewer_role_id=claim.scope.observer_role_id,
-            evidence_revision=claim.evidence_revision,
-            policy_version=POLICY_VERSION,
-            result="reaffirmed",
-        )
-        return replace(claim, review_receipts=(*claim.review_receipts, receipt))
+        return claim.with_confirmation(POLICY_VERSION, utc_now())
 
     def _promote_if_ready(self, claim: YouClaim) -> YouClaim:
         if claim.lifecycle != "candidate":

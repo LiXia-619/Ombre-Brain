@@ -1249,6 +1249,52 @@ async def build_system_diagnostics() -> dict[str, Any]:
         action="如长期停止，请重启服务并查看日志" if not decay_running else "",
     ))
 
+    # 核心准则每次对话无条件全量注入，但它和 breath 的 token 预算是两个独立
+    # 配置，谁也不知道对方。准则一多、一长，就会有几条静静地装不下——而使用者
+    # 感知到的只是「它今天怎么什么都没想起来」，不会想到去查 breath_max_tokens。
+    # 这个检查把那条看不见的线画出来。
+    try:
+        pinned_report = await _pinned_budget_report()
+    except Exception as exc:
+        checks.append(_check(
+            "pinned_token_budget",
+            "核心准则预算",
+            "warning",
+            f"无法核对核心准则的 token 预算：{type(exc).__name__}",
+        ))
+    else:
+        required = pinned_report["required_tokens"]
+        limit = pinned_report["limit_tokens"]
+        count = pinned_report["pinned_count"]
+        if not count:
+            status, message, action = "ok", "没有核心准则，不占预算", ""
+        elif required > limit:
+            status = "error"
+            message = (
+                f"{count} 条核心准则需要约 {required} token，"
+                f"超过 breath_max_tokens={limit}，会有准则返回不出来"
+            )
+            action = "调高 surfacing.breath_max_tokens，或精简/取消部分核心准则"
+        elif required > limit * 0.8:
+            status = "warning"
+            message = (
+                f"{count} 条核心准则已占用约 {required}/{limit} token，"
+                "再加或再长就会有准则返回不出来"
+            )
+            action = "考虑调高 surfacing.breath_max_tokens"
+        else:
+            status = "ok"
+            message = f"{count} 条核心准则约占 {required}/{limit} token"
+            action = ""
+        checks.append(_check(
+            "pinned_token_budget",
+            "核心准则预算",
+            status,
+            message,
+            details=pinned_report,
+            action=action,
+        ))
+
     summary = {"ok": 0, "warning": 0, "error": 0}
     for item in checks:
         status = item.get("status")
@@ -1258,6 +1304,36 @@ async def build_system_diagnostics() -> dict[str, Any]:
         "ok": summary["error"] == 0,
         "summary": summary,
         "checks": checks,
+    }
+
+
+async def _pinned_budget_report() -> dict[str, Any]:
+    """量一下核心准则渲染出来要多少 token，和 breath 的预算比一比。"""
+    from tools.breath._verbatim import render_stored_bucket
+
+    surfacing = sh.config.get("surfacing", {}) or {}
+    limit = int(surfacing.get("breath_max_tokens") or 10000)
+    buckets = await sh.bucket_mgr.list_all()
+    pinned = [b for b in buckets if (b.get("metadata") or {}).get("pinned")]
+    required = 0
+    largest = 0
+    for bucket in pinned:
+        try:
+            _, cost = render_stored_bucket(
+                bucket, f"📌 [核心准则] [bucket_id:{bucket['id']}]", ""
+            )
+        except Exception:
+            continue
+        required += cost
+        largest = max(largest, cost)
+    return {
+        "pinned_count": len(pinned),
+        "required_tokens": required,
+        "limit_tokens": limit,
+        "largest_entry_tokens": largest,
+        "max_pinned": int(
+            (sh.config.get("limits", {}) or {}).get("max_pinned") or 20
+        ),
     }
 
 

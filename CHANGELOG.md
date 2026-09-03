@@ -2,6 +2,51 @@
 
 本项目版本号见根目录 `VERSION` 文件，Docker 镜像 tag 与之对应（`p0luz/ombre-brain:<VERSION>`）。
 
+## 3.6.12
+
+> 一个让 Gemini 侧整批工具不可用的 bug。没有新功能。
+
+### 修复 / Fixed
+
+- **Gemini 拒绝全部工具：`Optional[X]` 生成的 schema 没有 `type` 字段**（#119）。
+  报错形如：
+
+  ```
+  Unable to submit request because `<instance>_breath_advanced` functionDeclaration
+  `<...>.domain` schema didn't specify the schema type field
+  ```
+
+  - Gemini 的 functionDeclaration 用 OpenAPI 3.0 的一个子集，其 `Schema.type` 是
+    **Required**（v1beta discovery 文档原文 "Required. Data type."）。而
+    `Optional[X]` 经 pydantic 生成的是
+    `{"anyOf": [{"type": "X"}, {"type": "null"}], ...}`——`anyOf` 本身 Gemini 认，
+    但**这一层没有 `type`**。Claude / OpenAI 接受，所以此前没暴露。
+  - **不是某个工具的问题**：14/16 个工具、106 个参数都是这个形状。Gemini 校验到
+    第一个不合格的就整批失败，报出来的 `breath_advanced.domain` 只是它先撞上的
+    那个；只修一个，错误会立刻移到下一个工具。
+  - **没有动注解里的 `Optional`**。它是承重的——`tools/breath/__init__.py` 有一整
+    段 Null-safe coercion，说明真的有客户端在传 `null`。改成 `str = ""` 之后
+    pydantic 会开始拒绝 `null`，等于用一个兼容性问题换另一个。
+  - 改的是**对外声明的 schema**（`tool.parameters`），运行时校验器
+    （`fn_metadata.arg_model`）一个字没动，所以老客户端照样传得进 `null`。
+  - 联合类型在 OpenAPI 3.0 里没有对应写法，必须挑一支。挑掉的那一支运行时仍然
+    收，只是不再出现在工具声明里：
+    - `media` / `media_append` / `media_replace` → `array<string>`。字符串形只是
+      `{"path": ...}` 的简写，信息量一样；`data_base64` 那一支是 Dashboard／导入
+      侧的用法，模型不会手打 base64。保住「一次多项」。
+    - `quotes` / `quotes_replace` → `array<object>`，**与 media 相反**。字典形带
+      `speaker` / `at`，压成字符串会让模型永远记不下「这句话是谁说的」——那是
+      rule.md 第 16 条要守的。丢简写可以，丢归属不行。
+    - `source_ranges` → `array<array<integer>>`，`meaning_replace` /
+      `bucket_ids` / `names` → `array<string>`：均无损。
+    - `grow.items` → `array<object>`，属性不在 schema 里展开，形状仍以工具文档串
+      为准（两处各写一遍只会漂移）。
+  - `breath` 仍是 0 参数（claude.ai 按需加载会跳过参数复杂的工具），压平不给它
+    加出任何属性。
+  - `tests/test_advertised_schema_is_strict.py` 走 `list_tools` 递归检查每一层，
+    并单独把 `You` / `Them` 两个动态工具挂起来验一次——它们默认关着，不出现在
+    全量检查里，正是最容易漏掉压平调用点的地方。
+
 ## 3.6.11
 
 > 两个 Dashboard 上看得见的 bug。没有新功能。

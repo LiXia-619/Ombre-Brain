@@ -54,6 +54,7 @@ from ombrebrain.storage.source_store import SourceStore
 from ombrebrain.them import ThemService, ThemStore, ThemToolGate
 from ombrebrain.you import YouService, YouStore, YouToolGate
 from ombrebrain.security.deployment_profile import enforce_mcp_network_guard
+from ombrebrain.protocol.strict_schema import harden_registered_tools
 from import_memory import ImportEngine
 from migrate_engine import MigrateEngine
 from utils import get_version, load_config, setup_logging
@@ -1326,6 +1327,18 @@ for _strict_tool_name in (
             _strict_tool_name,
             _schema_exc,
         )
+
+
+# 每个属性补上 type：Gemini 的 functionDeclaration 要求 Schema.type 必填，而
+# `Optional[X]` 生成的 anyOf 那一层没有它，一个不合格就整批工具被拒。只改对外
+# 声明，运行时校验器不动——老客户端照样传得进 null。详见 strict_schema 的模块
+# 文档串。必须排在上面那个 strict 循环之后：它会用 model_json_schema() 整个重
+# 生成 parameters，放前面会被冲掉。
+try:
+    _hardened = harden_registered_tools(mcp)
+    logger.debug("advertised schema hardened for %d tools", _hardened)
+except Exception as _harden_exc:  # noqa: BLE001 - 压不平也要能起服务
+    logger.warning("advertised schema hardening unavailable: %s", _harden_exc)
 
 
 # You 与 Them 是仅有的两个动态工具：各自按持久开关在唯一连接器 /mcp 上

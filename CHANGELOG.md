@@ -2,6 +2,42 @@
 
 本项目版本号见根目录 `VERSION` 文件，Docker 镜像 tag 与之对应（`p0luz/ombre-brain:<VERSION>`）。
 
+## 3.6.13
+
+> 一个参数没开出来的 bug。没有新功能。
+
+### 修复 / Fixed
+
+- **`breath_advanced(quotes=True)` 报 `extra_forbidden`。** 真机报错：
+
+  ```
+  Error executing tool breath_advanced: 1 validation error for
+  breath_advancedArguments
+  Extra inputs are not permitted [type=extra_forbidden, input_value=True,
+  input_type=bool]
+  ```
+
+  - `quotes` 在 `tools/breath.dispatch` 里有、在 `breath_search` 里有，**唯独
+    `breath_advanced` 的签名漏了**，于是撞上 `extra=forbid`。
+  - 这形成一个死角：`breath_search` 的文档串写着「需要 tags / importance_min /
+    valence / arousal / max_tokens / catalog 等更多过滤维度用
+    `breath_advanced(...)`」，而 `breath_advanced` 自称「breath 的完整参数版」。
+    想同时要引语和标签的模型照着文档转过去，一调就炸。
+  - **没有放松校验**。`extra=forbid` 是对的——拼错的参数必须响亮地失败，不能
+    静默降级成另一种检索。修的是补齐参数。
+  - 顺带扫了其余工具的同类漂移（dispatch 支持但 MCP 层没开出来）：`breath` 与
+    `breath_search` 的子集是有意的，文档串明写「更多维度用 breath_advanced」，
+    只有 `breath_advanced` 这一处是 bug。
+  - `tests/test_breath_advanced_is_actually_complete.py` 钉的是契约而不是这一个
+    参数：`breath_advanced` 必须是 `breath_search` 的超集、必须接住 `dispatch`
+    的全部参数、且必须真的**透传**下去（漏传是静默失效，比报错更难发现）。
+
+### 说明 / Note
+
+- 老记忆没有引语这一层，这不影响 `quotes=True`：`quotes_from_metadata` 对没有
+  该字段的桶返回空表，渲染出空串，正文后什么都不附加——不报错，也不多占 token。
+  报告里那个错与老桶无关，纯粹是参数没开出来。
+
 ## 3.6.12
 
 > 一个让 Gemini 侧整批工具不可用的 bug。没有新功能。

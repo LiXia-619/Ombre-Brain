@@ -79,6 +79,7 @@ EXPECTED_TOOL_PROPERTIES = {
         "catalog",
         "date_from",
         "date_to",
+        "quotes",
         "mode",
         "with_ids",
     },
